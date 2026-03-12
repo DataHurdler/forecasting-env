@@ -28,7 +28,7 @@ Each student/team submits:
 
 ## 6) Prompt Policy
 - Maximum prompt budget: `<set limit here, default 20>`
-- Budget includes the initial required contract prompt.
+- Budget excludes the initial required contract prompt.
 - Students must start with the exact prompt in `prompts/REQUIRED_INITIAL_PROMPT.md`.
 - All prompts must be logged in `PROMPT_LOG.jsonl`.
 - Students must commit after every prompt.

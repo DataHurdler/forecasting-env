@@ -6,6 +6,7 @@ This folder defines grading policy used by instructor-side validation.
 - `homework_limits.json`: prompt budget and required files.
 - `locked_paths.txt`: files/directories that should remain unchanged in student submissions.
 - `homework_limits.json` also defines commit-per-prompt policy.
+- `count_initial_prompt_toward_limit` controls whether the initial contract prompt uses budget.
 
 ## Important Enforcement Note
 Students can still edit local files on their own machines.  

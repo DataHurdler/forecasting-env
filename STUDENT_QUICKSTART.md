@@ -21,5 +21,5 @@
 ## 4) Before Submitting
 - Check that a grader can run your work from repo contents only.
 - Confirm your report explains the business recommendation.
-- Confirm prompt log is complete and within the prompt limit in the assignment.
+- Confirm prompt log is complete and within the prompt limit in the assignment (initial contract prompt is excluded from the budget).
 - Confirm there is one commit per prompt and commit messages include prompt ids.

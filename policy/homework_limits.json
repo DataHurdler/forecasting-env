@@ -1,5 +1,6 @@
 {
   "default_max_prompts": 20,
+  "count_initial_prompt_toward_limit": false,
   "require_commit_per_prompt": true,
   "required_submission_files": [
     "REPORT.md",
@@ -8,7 +9,7 @@
   ],
   "homeworks": {
     "hw01": {
-      "max_prompts": 20
+      "max_prompts": 5
     }
   }
 }

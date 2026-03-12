@@ -11,3 +11,7 @@ Store official assignment prompts, templates, and grading rubrics in this folder
 
 ## Start Point
 Use `HW_TEMPLATE.md` to create each new assignment.
+
+## Current Assignments
+- `hw01_prompt.md`
+- `hw01_rubric.md`

@@ -10,7 +10,8 @@ CONTRACT RULES
 
 2) Prompt budget is mandatory:
 - Use the assignment prompt limit (default 20 if not specified).
-- Count this initial contract prompt toward the prompt budget.
+- Do not count this initial contract prompt toward the prompt budget.
+- The budget applies only to prompts after this initial contract prompt.
 - If the next prompt would exceed the allowed limit, do not execute new work.
 - Reply exactly:
   `PROMPT_LIMIT_REACHED`
@@ -32,6 +33,10 @@ CONTRACT RULES
 
 STARTUP ACTIONS
 - If `homework_id` and `student_or_team_name` are not provided yet, ask for them first.
+- Read and follow these repository files before doing any homework work:
+  - `AGENTS.md`
+  - `assignments/<homework_id>_prompt.md`
+  - `policy/homework_limits.json`
 - Create the submission folder when missing.
 - Save this exact prompt text as `INITIAL_PROMPT.md` in the submission folder.
 - Append this exact prompt as prompt_id 1 in `PROMPT_LOG.jsonl`.

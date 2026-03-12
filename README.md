@@ -36,7 +36,7 @@ Students clone this repo to their own machines and use Codex as their coding ass
 3. Add code in notebooks and/or `src/`.
 4. Keep `INITIAL_PROMPT.md` and `PROMPT_LOG.jsonl` in the submission folder.
 5. Create one git commit after each prompt with message: `hwNN prompt <id>: <short summary>`.
-6. Keep prompt usage within the assignment limit (including the initial contract prompt).
+6. Keep prompt usage within the assignment limit (excluding the initial contract prompt).
 7. Include a short `REPORT.md` with business conclusions.
 8. Push changes with clear commit messages.
 

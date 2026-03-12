@@ -16,7 +16,7 @@ Checks:
 - required submission files present,
 - `INITIAL_PROMPT.md` matches required initial prompt text,
 - prompt log format and sequential prompt ids,
-- prompt count does not exceed policy limit,
+- budgeted prompt count does not exceed policy limit (default excludes initial contract prompt),
 - one commit per prompt when commit policy is enabled,
 - commit messages match format: `hwNN prompt <id>: <short summary>`.
 

@@ -18,6 +18,7 @@ class ValidationResult:
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     submission_prompt_counts: dict[str, int] = field(default_factory=dict)
+    submission_budget_prompt_counts: dict[str, int] = field(default_factory=dict)
     submission_commit_counts: dict[str, int] = field(default_factory=dict)
 
     def add_error(self, message: str) -> None:
@@ -226,6 +227,7 @@ def validate_submission_folder(
     required_files: list[str],
     required_initial_prompt_text: str,
     max_prompts: int,
+    count_initial_prompt_toward_limit: bool,
 ) -> None:
     submission_label = submission_dir.as_posix()
 
@@ -249,19 +251,28 @@ def validate_submission_folder(
     if not records:
         return
 
-    prompt_count = len(records)
-    result.submission_prompt_counts[submission_label] = prompt_count
-    if prompt_count > max_prompts:
-        result.add_error(
-            f"{submission_label}: prompt count {prompt_count} exceeds limit {max_prompts}."
-        )
-
+    total_prompt_count = len(records)
+    result.submission_prompt_counts[submission_label] = total_prompt_count
     first_prompt = records[0].get("prompt")
+    first_prompt_matches_required = False
     if not isinstance(first_prompt, str):
         result.add_error(f"{submission_label}: first prompt text is missing.")
     elif normalize_text(first_prompt) != required_initial_prompt_text:
         result.add_error(
             f"{submission_label}: first prompt in PROMPT_LOG.jsonl does not match required initial prompt."
+        )
+    else:
+        first_prompt_matches_required = True
+
+    budget_prompt_count = total_prompt_count
+    if not count_initial_prompt_toward_limit and first_prompt_matches_required:
+        budget_prompt_count = max(total_prompt_count - 1, 0)
+    result.submission_budget_prompt_counts[submission_label] = budget_prompt_count
+
+    if budget_prompt_count > max_prompts:
+        inclusion_text = "including initial prompt" if count_initial_prompt_toward_limit else "excluding initial prompt"
+        result.add_error(
+            f"{submission_label}: budgeted prompt count {budget_prompt_count} exceeds limit {max_prompts} ({inclusion_text})."
         )
 
 
@@ -296,7 +307,7 @@ def validate_commit_per_prompt(
     result: ValidationResult,
     student_root: Path,
     submission_dir: Path,
-    prompt_count: int,
+    total_prompt_count: int,
     homework_id: str,
 ) -> None:
     submission_label = submission_dir.as_posix()
@@ -340,7 +351,7 @@ def validate_commit_per_prompt(
             continue
         prompt_id_counts[prompt_id] = prompt_id_counts.get(prompt_id, 0) + 1
 
-    for prompt_id in range(1, prompt_count + 1):
+    for prompt_id in range(1, total_prompt_count + 1):
         if prompt_id not in prompt_id_counts:
             result.add_error(
                 f"{submission_label}: missing commit message for prompt_id {prompt_id} "
@@ -348,10 +359,10 @@ def validate_commit_per_prompt(
             )
 
     for prompt_id, count in sorted(prompt_id_counts.items()):
-        if prompt_id > prompt_count:
+        if prompt_id > total_prompt_count:
             result.add_warning(
                 f"{submission_label}: commit message references prompt_id {prompt_id} "
-                f"beyond logged prompt count {prompt_count}."
+                f"beyond logged prompt count {total_prompt_count}."
             )
         if count > 1:
             result.add_warning(
@@ -359,10 +370,10 @@ def validate_commit_per_prompt(
             )
 
     commits_with_prompt_id = sum(prompt_id_counts.values())
-    if commits_with_prompt_id < prompt_count:
+    if commits_with_prompt_id < total_prompt_count:
         result.add_error(
             f"{submission_label}: only {commits_with_prompt_id} commit(s) with prompt ids found "
-            f"for {prompt_count} logged prompts."
+            f"for {total_prompt_count} logged prompts."
         )
 
 
@@ -380,10 +391,22 @@ def collect_homework_submission_dirs(student_root: Path, homework_id: str) -> li
     )
 
 
+def get_homework_config(policy: dict[str, Any], homework_id: str) -> dict[str, Any]:
+    return policy.get("homeworks", {}).get(homework_id, {})
+
+
 def get_homework_prompt_limit(policy: dict[str, Any], homework_id: str) -> int:
     default_limit = policy.get("default_max_prompts", 20)
-    homework_cfg = policy.get("homeworks", {}).get(homework_id, {})
+    homework_cfg = get_homework_config(policy, homework_id)
     return int(homework_cfg.get("max_prompts", default_limit))
+
+
+def get_count_initial_prompt_toward_limit(
+    policy: dict[str, Any], homework_id: str
+) -> bool:
+    default_value = bool(policy.get("count_initial_prompt_toward_limit", True))
+    homework_cfg = get_homework_config(policy, homework_id)
+    return bool(homework_cfg.get("count_initial_prompt_toward_limit", default_value))
 
 
 def main() -> int:
@@ -428,6 +451,9 @@ def main() -> int:
     )
     homework_id = args.homework
     max_prompts = get_homework_prompt_limit(policy, homework_id)
+    count_initial_prompt_toward_limit = get_count_initial_prompt_toward_limit(
+        policy, homework_id
+    )
     require_commit_per_prompt = bool(policy.get("require_commit_per_prompt", False))
 
     submission_dirs = collect_homework_submission_dirs(student_root, homework_id)
@@ -443,14 +469,17 @@ def main() -> int:
                 required_files=required_files,
                 required_initial_prompt_text=required_initial_prompt_text,
                 max_prompts=max_prompts,
+                count_initial_prompt_toward_limit=count_initial_prompt_toward_limit,
             )
-            prompt_count = result.submission_prompt_counts.get(submission_dir.as_posix())
-            if require_commit_per_prompt and prompt_count is not None:
+            total_prompt_count = result.submission_prompt_counts.get(
+                submission_dir.as_posix()
+            )
+            if require_commit_per_prompt and total_prompt_count is not None:
                 validate_commit_per_prompt(
                     result=result,
                     student_root=student_root,
                     submission_dir=submission_dir,
-                    prompt_count=prompt_count,
+                    total_prompt_count=total_prompt_count,
                     homework_id=homework_id,
                 )
 
@@ -466,8 +495,21 @@ def main() -> int:
         return 1
 
     print("VALIDATION PASSED")
-    for submission_label, prompt_count in sorted(result.submission_prompt_counts.items()):
-        print(f"- {submission_label}: prompt_count={prompt_count}, limit={max_prompts}")
+    inclusion_text = (
+        "including_initial"
+        if count_initial_prompt_toward_limit
+        else "excluding_initial"
+    )
+    for submission_label, total_prompt_count in sorted(
+        result.submission_prompt_counts.items()
+    ):
+        budget_prompt_count = result.submission_budget_prompt_counts.get(
+            submission_label, total_prompt_count
+        )
+        print(
+            f"- {submission_label}: total_prompt_count={total_prompt_count}, "
+            f"budget_prompt_count={budget_prompt_count}, limit={max_prompts} ({inclusion_text})"
+        )
     if require_commit_per_prompt:
         for submission_label, commit_count in sorted(result.submission_commit_counts.items()):
             print(f"- {submission_label}: commit_count={commit_count}")
