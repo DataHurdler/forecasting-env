@@ -21,10 +21,20 @@ Describe the decision context and why this forecast matters.
 ## 5) Deliverables
 Each student/team submits:
 - `submissions/hwNN_<student_or_team_name>/REPORT.md`
+- `submissions/hwNN_<student_or_team_name>/INITIAL_PROMPT.md`
+- `submissions/hwNN_<student_or_team_name>/PROMPT_LOG.jsonl`
 - Reproducible code (`.ipynb` and/or `.py`)
 - Output artifacts (tables/figures) used in the report
 
-## 6) Report Requirements
+## 6) Prompt Policy
+- Maximum prompt budget: `<set limit here, default 20>`
+- Budget includes the initial required contract prompt.
+- Students must start with the exact prompt in `prompts/REQUIRED_INITIAL_PROMPT.md`.
+- All prompts must be logged in `PROMPT_LOG.jsonl`.
+- Students must commit after every prompt.
+- Required commit message format: `hwNN prompt <id>: <short summary>`.
+
+## 7) Report Requirements
 Your `REPORT.md` should include:
 - objective and business question,
 - data checks and key preprocessing steps,
@@ -32,11 +42,11 @@ Your `REPORT.md` should include:
 - recommendation and business implications,
 - limitations and next steps.
 
-## 7) Grading Criteria
+## 8) Grading Criteria
 - problem framing and business interpretation,
 - methodological correctness,
 - reproducibility and code quality,
 - clarity of communication.
 
-## 8) Academic Integrity
+## 9) Academic Integrity
 Use Codex as a coding assistant, but ensure final work is your own and explainable.

@@ -1,0 +1,7 @@
+# Files/directories that students should not modify.
+# Enforced by instructor-side validation against the canonical reference repo.
+
+AGENTS.md
+assignments/
+policy/
+prompts/REQUIRED_INITIAL_PROMPT.md

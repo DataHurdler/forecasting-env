@@ -1,0 +1,14 @@
+{
+  "default_max_prompts": 20,
+  "require_commit_per_prompt": true,
+  "required_submission_files": [
+    "REPORT.md",
+    "INITIAL_PROMPT.md",
+    "PROMPT_LOG.jsonl"
+  ],
+  "homeworks": {
+    "hw01": {
+      "max_prompts": 20
+    }
+  }
+}

@@ -29,10 +29,15 @@ Students run Codex locally against this repo.
 - Prefer small, auditable changes over large rewrites.
 - Keep dependency/setup assumptions inside each assignment deliverable.
 - Do not commit secrets, tokens, or private datasets.
+- Keep `PROMPT_LOG.jsonl` current with every student prompt in each homework folder.
+- Keep `INITIAL_PROMPT.md` as the exact required initial contract prompt.
+- Create one git commit after each prompt with commit message including the prompt id.
 
 ## Deliverable Minimum
 Each homework submission should include:
 - a reproducible analysis artifact (`.ipynb` and/or `.py`),
+- `INITIAL_PROMPT.md`,
+- `PROMPT_LOG.jsonl`,
 - a short `REPORT.md` covering objective, method, results, and recommendation,
 - at least one baseline model and one comparison model,
 - evaluation metrics with brief interpretation.
