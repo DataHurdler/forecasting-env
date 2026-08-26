@@ -172,21 +172,22 @@ def load_prompt_log(path: Path, result: ValidationResult) -> list[dict[str, Any]
         result.add_error(f"Missing prompt log: {path}")
         return []
 
+    # PROMPT_LOG.md format: blocks headed "### Prompt <n> — <timestamp>", body = the prompt.
     records: list[dict[str, Any]] = []
-    for line_no, line in enumerate(raw_lines, start=1):
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            record = json.loads(line)
-        except json.JSONDecodeError:
-            result.add_error(f"Invalid JSONL in {path} at line {line_no}")
-            continue
-        if not isinstance(record, dict):
-            result.add_error(f"Non-object JSON record in {path} at line {line_no}")
-            continue
-        records.append(record)
-
+    text = "\n".join(raw_lines)
+    for m in re.finditer(
+        r"^###\s+Prompt\s+(\d+)\s*(?:[—\-–]\s*(.*?))?$(.*?)(?=^###\s+Prompt\s+\d+|\Z)",
+        text, re.M | re.S,
+    ):
+        records.append({
+            "prompt_id": int(m.group(1)),
+            "timestamp_local": (m.group(2) or "").strip(),
+            "prompt": (m.group(3) or "").strip(),
+        })
+    if not records and text.strip():
+        result.add_error(
+            f"{path}: no '### Prompt <n>' entries found. See AI_POLICY.md for the format."
+        )
     return records
 
 
@@ -196,7 +197,7 @@ def validate_prompt_log_schema(
     submission_label: str,
 ) -> None:
     if not records:
-        result.add_error(f"{submission_label}: PROMPT_LOG.jsonl is empty.")
+        result.add_error(f"{submission_label}: PROMPT_LOG.md is empty.")
         return
 
     for idx, record in enumerate(records, start=1):
@@ -237,14 +238,7 @@ def validate_submission_folder(
             result.add_error(f"{submission_label}: missing required file {rel}.")
 
     initial_prompt_path = submission_dir / "INITIAL_PROMPT.md"
-    prompt_log_path = submission_dir / "PROMPT_LOG.jsonl"
-
-    if initial_prompt_path.exists():
-        initial_text = normalize_text(read_text(initial_prompt_path))
-        if initial_text != required_initial_prompt_text:
-            result.add_error(
-                f"{submission_label}: INITIAL_PROMPT.md does not match required prompt."
-            )
+    prompt_log_path = submission_dir / "PROMPT_LOG.md"
 
     records = load_prompt_log(prompt_log_path, result)
     validate_prompt_log_schema(result, records, submission_label)
@@ -253,26 +247,16 @@ def validate_submission_folder(
 
     total_prompt_count = len(records)
     result.submission_prompt_counts[submission_label] = total_prompt_count
-    first_prompt = records[0].get("prompt")
-    first_prompt_matches_required = False
-    if not isinstance(first_prompt, str):
-        result.add_error(f"{submission_label}: first prompt text is missing.")
-    elif normalize_text(first_prompt) != required_initial_prompt_text:
-        result.add_error(
-            f"{submission_label}: first prompt in PROMPT_LOG.jsonl does not match required initial prompt."
-        )
-    else:
-        first_prompt_matches_required = True
-
+    # The initial prompt is assignment-specific and saved separately as INITIAL_PROMPT.md,
+    # so it is not expected to appear as entry 1 of the log.
     budget_prompt_count = total_prompt_count
-    if not count_initial_prompt_toward_limit and first_prompt_matches_required:
-        budget_prompt_count = max(total_prompt_count - 1, 0)
     result.submission_budget_prompt_counts[submission_label] = budget_prompt_count
 
     if budget_prompt_count > max_prompts:
-        inclusion_text = "including initial prompt" if count_initial_prompt_toward_limit else "excluding initial prompt"
-        result.add_error(
-            f"{submission_label}: budgeted prompt count {budget_prompt_count} exceeds limit {max_prompts} ({inclusion_text})."
+        # Budgets are targets, not limits (policy: budgets_are_soft). Report, do not fail.
+        result.add_warning(
+            f"{submission_label}: {budget_prompt_count} prompts against a budget of {max_prompts}. "
+            "Permitted — check the student noted where they got stuck."
         )
 
 
@@ -447,7 +431,7 @@ def main() -> int:
 
     required_files = policy.get(
         "required_submission_files",
-        ["REPORT.md", "INITIAL_PROMPT.md", "PROMPT_LOG.jsonl"],
+        ["REPORT.md", "INITIAL_PROMPT.md", "PROMPT_LOG.md"],
     )
     homework_id = args.homework
     max_prompts = get_homework_prompt_limit(policy, homework_id)

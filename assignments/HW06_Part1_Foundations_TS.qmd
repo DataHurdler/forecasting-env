@@ -1,0 +1,276 @@
+---
+title: "Homework 6: Bayesian Foundations, Time Series, and Hierarchical Models"
+subtitle: "ECON 8310: Business Forecasting — University of Nebraska at Omaha · Fall 2026"
+author: "Your Name"
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    code-fold: false
+    self-contained: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+> **Due Week 13.** Covers Lecture 10 (foundations) and Lecture 11 Part 1 (structural time series).
+
+---
+
+::: {.callout-note}
+## Your numbers will not match mine, and that is fine
+
+Every result in this course depends on a random seed, and often also on your library
+versions, your hardware, and how many CPU threads your machine uses. Two people running
+identical, correct code will get different numbers — sometimes noticeably different.
+
+**What is graded** is that you used the right model and the right procedure, and that your
+interpretation follows from the numbers *you* actually obtained. Quote your own output.
+
+**What is not graded** is matching any particular value. Do not tune your way toward a number
+you saw on a slide or heard from a classmate — that is the one way to turn this into a wrong
+answer.
+
+One caveat worth knowing. The broad *ordering* of models usually survives this variation. If
+yours comes out backwards from what the lecture found, say so in a sentence and offer a reason:
+either you have found something real about your run, or there is a bug worth hunting. Both are
+worth more marks than quietly reporting a number you do not believe.
+:::
+
+## Overview
+
+Two things separate a Bayesian forecast from everything else in this course: you state your
+assumptions as priors and can check them before fitting, and the answer is a distribution rather
+than a number.
+
+Part 1 does both on a single series. You will check a prior before trusting it, fit a
+Beta-Binomial by hand, then build a structural time-series model with a random-walk level and
+Fourier seasonality — and judge its forecast on **two** criteria, accuracy and honesty.
+
+**Learning objectives.** By the end you will be able to:
+
+- Run and read a prior predictive check, and say what it rules out
+- Fit and diagnose a PyMC model, reporting $\hat{R}$, ESS and divergences
+- Decompose a series into level and seasonality with priors on each
+- Judge a predictive interval on both calibration and usefulness
+
+---
+
+## Dataset and Setup
+
+```{python}
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import pymc as pm
+import arviz as az
+import warnings, logging
+warnings.filterwarnings('ignore')
+logging.getLogger('pymc').setLevel(logging.ERROR)
+
+from pathlib import Path
+
+def data_path(name):
+    for base in (Path.cwd(), *Path.cwd().parents):
+        p = base / "data" / "processed" / name
+        if p.exists():
+            return p
+    raise FileNotFoundError(
+        f"Could not find data/processed/{name}. "
+        "Run `python scripts/prep_m5.py` from the repository root first."
+    )
+
+RANDOM_STATE = 42
+
+weekly = (pd.read_csv(data_path("m5_weekly.csv"), parse_dates=["week_start"])
+            .sort_values(["store_id", "cat_id", "week_start"]))
+weekly["series"] = weekly.store_id + "_" + weekly.cat_id
+
+# A "high-SNAP" week is one with 5 or more SNAP benefit days
+weekly["hi_snap"] = (weekly.snap_days >= 5).astype(int)
+
+# One series for the single-series work
+ca1 = weekly[weekly.series == "CA_1_FOODS"].reset_index(drop=True)
+
+print(f"{weekly.series.nunique()} series | CA_1 FOODS: {len(ca1)} weeks | "
+      f"high-SNAP: {ca1.hi_snap.sum()} of {len(ca1)} ({100*ca1.hi_snap.mean():.0f}%)")
+```
+
+::: {.callout-important}
+## Report diagnostics with every model
+
+Lecture 10 gave you three checks, and this assignment expects all three for **every** model you
+fit: $\hat{R} < 1.01$, ESS $> 400$, and **zero divergences**.
+`az.summary(idata, ci_kind="hdi", ci_prob=0.94)` gives the first
+two; `pm.sample` reports divergences as it runs.
+
+A model that fails these has not converged, and its posterior means nothing — report the failure
+rather than the numbers.
+:::
+
+---
+
+## Initial Prompt for Codex
+
+::: {.callout-important}
+## Initial Prompt for Codex
+
+Paste this as the very first message in your Codex session. It does **not** count against your
+prompt budget.
+
+```
+I am working on Homework 6 Part 1 for ECON 8310: Business Forecasting at the
+University of Nebraska at Omaha.
+
+Dataset: M5/Walmart — weekly aggregated, 30 store-category series, at
+`data/processed/m5_weekly.csv`. Columns: store_id, cat_id, state_id,
+week_start, units (target), avg_price, snap_days, event_days. I derive
+hi_snap = (snap_days >= 5). CA_1_FOODS is the single series used for
+single-series work.
+
+This part covers a Beta-Binomial rate model and a structural time series model for one series.
+
+This homework uses PyMC and ArviZ. I will ask you questions one at a time.
+For each:
+1. Write clean, well-commented Python that runs end-to-end
+2. Report R-hat, ESS and divergences for every model fitted
+3. Explain what the output means so that I understand it — but do NOT draft the written
+   answers I submit. The interpretation and business-recommendation sections are mine to
+   write, in my own words.
+
+My prompt budget for Part 1 is 10 (this context prompt is excluded). I will label
+each question before asking.
+
+
+Repository rules — these apply to every prompt in this thread:
+- My submission folder is `submissions/hw06_part1_<my_name>/`. Put everything there.
+- Keep a `PROMPT_LOG.md` in that folder. For every prompt I send, append a block:
+      ### Prompt <n> — YYYY-MM-DD HH:MM
+      <my prompt, verbatim>
+  Numbered from 1, in order. Never edit or delete an earlier entry. If your tool cannot write
+  files, I will paste them in myself.
+- After finishing the work for each prompt, make exactly one git commit:
+  `hw06_part1 prompt <prompt_id>: <short summary>`
+- If a prompt would take me past my budget of 10, do not do the work. Reply exactly
+  PROMPT_LIMIT_REACHED, and still log that prompt.
+- Never modify `AGENTS.md`, anything in `assignments/`, or anything in `policy/`.
+
+Confirm by responding with: HW06P1_CONTEXT_ACK
+```
+
+Submit this text as **`INITIAL_PROMPT.md`** in your submission folder.
+:::
+
+---
+
+## Part A: Foundations — the SNAP-Week Rate
+
+### Q1 — Prior Predictive Check *(Suggested prompts: 3)*
+
+Estimate the probability that any given week is a **high-SNAP week**. Model the count out of
+CA_1 FOODS's 277 weeks as Beta-Binomial:
+
+- Prior: `theta ~ Beta(2, 2)` — weakly informative, centred at 0.5
+- Likelihood: `obs ~ Binomial(n=277, p=theta)`, observed = the actual count
+
+**Before fitting anything**, run `pm.sample_prior_predictive(500)` and plot what the prior alone
+implies about the number of high-SNAP weeks.
+
+```{python}
+n_total = len(ca1)
+n_hi = int(ca1.hi_snap.sum())
+print(f"CA_1 FOODS: {n_hi} high-SNAP weeks out of {n_total} ({100*n_hi/n_total:.0f}%)")
+
+# Build the model and run the prior predictive check
+```
+
+> **Your response:** What range does the prior predictive cover, and is it plausible? SNAP is
+> disbursed on a published calendar, so the true rate is not a mystery — given that, is
+> `Beta(2, 2)` too vague? Propose a prior encoding "roughly a quarter of weeks" and say what
+> `alpha` and `beta` you would use and why.
+
+---
+
+### Q2 — Posterior Inference *(Suggested prompts: 2)*
+
+Fit the model. Report the posterior mean and the 94% HDI, and report $\hat{R}$, ESS and
+divergences.
+
+```{python}
+# Fit, then az.summary(idata, ci_kind="hdi", ci_prob=0.94) and az.plot_posterior
+```
+
+> **Your response:** Where does the posterior sit relative to the prior mean of 0.5 and the raw
+> data proportion? Explain the position in terms of how much information 277 observations carry
+> against a `Beta(2, 2)` prior. Then state the probability that the true rate exceeds 0.30,
+> computed from the posterior samples.
+
+---
+
+## Part B: Structural Time Series — CA_1 FOODS
+
+### Q3 — Level and Seasonality *(Suggested prompts: 3)*
+
+Build the model from Lecture 11 Part 1 on the **first 225 weeks**, holding out the final 52.
+
+- A random-walk level, written **non-centred**: `level = cumsum(z * sigma_level)` with
+  `z ~ Normal(0, 1)`
+- Fourier seasonality with `K = 3` and period `P = 52` — six coefficients with `Normal(0, 0.5)` priors
+- `sigma_level ~ Exponential(10)`, `sigma ~ Exponential(1)`
+- **Standardize `units` before fitting**, and invert afterwards
+
+```{python}
+N_TEST = 52
+train, test = ca1.iloc[:-N_TEST], ca1.iloc[-N_TEST:]
+
+# Build Fourier design matrix, standardize, fit
+```
+
+> **Your response:** Report $\hat{R}$, ESS and divergences. Then: the lecture noted that writing
+> the level with `pm.GaussianRandomWalk` gave $\hat{R}$ = 1.022 and ESS = 252 — both failing their
+> thresholds while the forecast still looked reasonable. Explain what the non-centred form
+> changes — not statistically, but about the *shape* the sampler has to explore.
+
+---
+
+### Q4 — Forecast, and Whether to Trust It *(Suggested prompts: 2)*
+
+Forecast the held-out 52 weeks **two ways** and compare.
+
+**(a) Propagated** — let the level keep random-walking forward, which is what the fitted model
+implies. **(b) Held constant** — carry the last level forward unchanged.
+
+Report coverage and mean interval width for each, and additionally **split coverage by horizon**
+(roughly weeks 1–13, 14–39, 40–52). The frozen version produces intervals of near-constant width;
+the propagated one widens with horizon. Which is better calibrated on this series is a question
+for your data, not for theory — answer it from your numbers.
+
+Report three things: RMSE, the seasonal-naive RMSE for comparison, and the **coverage** of your
+94% interval (the fraction of held-out weeks falling inside).
+
+```{python}
+# Forecast both ways; compute RMSE, coverage and mean width for each
+# Then split coverage by horizon
+```
+
+> **Your response:** Answer two separate questions and do not let one excuse the other.
+> **Is the interval calibrated?** — compare coverage against the nominal 94%.
+> **Is it useful?** — report the mean interval width as a percentage of average weekly units, and
+> say whether you would place an inventory order against it.
+>
+> Then: your point forecast probably beats seasonal naive by only a few percent. Given that, what
+> is the actual argument for having fitted this model?
+
+---
+
+## Submission Checklist
+
+- [ ] All code cells run without errors from top to bottom
+- [ ] Written responses completed in your own words
+- [ ] `INITIAL_PROMPT.md` saved in `submissions/hw06_part1_<your_name>/`
+- [ ] `PROMPT_LOG.md` complete with **10 or fewer** entries for Part 1
+- [ ] One git commit per Codex prompt (`hw06_part1 prompt <id>: <short summary>`)
+- [ ] `REPORT.md` with a clear business recommendation

@@ -1,17 +1,17 @@
 # Assignments
 
-Store official assignment prompts, templates, and grading rubrics in this folder.
+The eleven homework assignments, as Quarto (`.qmd`) files.
 
-## Recommended Files Per Assignment
-- `hwNN_prompt.md`: student-facing instructions.
-- `hwNN_rubric.md`: grading rubric.
-- `hwNN_data_dictionary.md`: variable definitions and caveats.
-- Include explicit prompt budget in each `hwNN_prompt.md`.
-- Include explicit commit-per-prompt requirement and commit message format.
+**Do not edit these in place.** Copy the one you are working on into your own submission folder:
 
-## Start Point
-Use `HW_TEMPLATE.md` to create each new assignment.
+```bash
+cp assignments/HW01_Part1_ETS.qmd submissions/hw01_part1_<yourname>/
+```
 
-## Current Assignments
-- `hw01_prompt.md`
-- `hw01_rubric.md`
+Then edit your copy. These originals are read-only, and your submission is checked against them.
+
+Each assignment contains everything you need: the dataset description, the questions, the prompt
+budget, and the **Initial Prompt** to send your AI assistant before you begin.
+
+Rendered versions are on the course website if you would rather read them in a browser:
+<https://datahurdler.github.io/Forecasting-Course/>

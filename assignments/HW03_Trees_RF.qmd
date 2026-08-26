@@ -1,0 +1,341 @@
+---
+title: "Homework 3: Decision Trees and Random Forests"
+subtitle: "ECON 8310: Business Forecasting — University of Nebraska at Omaha · Fall 2026"
+author: "Your Name"
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    code-fold: false
+    self-contained: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+# Overview
+
+This homework shifts from time series methods to machine learning approaches for forecasting. Decision trees and random forests reframe the problem as supervised learning: rather than modeling a single series through time, each store-category-week row becomes an independent training example, and lagged unit sales carry the temporal information that would otherwise live inside a model like ARIMA or ETS. These methods require no stationarity assumptions and discover nonlinear interactions automatically — for example, the effect of a SNAP benefit week may differ sharply between food and hobby categories, and a tree will split on both features without any manual interaction term.
+
+**Learning objectives.** By the end of this assignment you will be able to:
+
+- Engineer lag and calendar features to turn a time series problem into a supervised learning problem
+- Fit and visualize a decision tree, and connect the splitting structure to business intuition
+- Fit a Random Forest and interpret its out-of-bag (OOB) error estimate
+- Compare mean decrease in impurity (MDI) vs permutation feature importance and articulate when each is trustworthy
+- Implement a walk-forward cross-validation loop for tree-based models
+
+---
+
+# Dataset and Feature Engineering
+
+Unlike ETS and ARIMA, which model one series at a time and require careful handling of seasonality and trend, tree-based models can use **all 30 series simultaneously**. The M5 extract holds 10 Walmart stores across 3 states, each with 3 product categories — 30 store-category series in all. Each store-category-week is a row in a flat table; the lag features encode how *that particular series* was performing recently. The model learns general rules that hold across series rather than fitting a separate process to each.
+
+The preprocessed file is `data/processed/m5_weekly.csv`. If it does not exist, run `python scripts/prep_m5.py` once from the repository root.
+
+```{python}
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.tree import DecisionTreeRegressor, export_text, plot_tree
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.inspection import permutation_importance
+from sklearn.metrics import mean_squared_error
+import warnings
+warnings.filterwarnings('ignore')
+
+from pathlib import Path
+
+def data_path(name):
+    """Find the processed data file whether you render from the repo root or from
+    this file's own folder."""
+    for base in (Path.cwd(), *Path.cwd().parents):
+        p = base / "data" / "processed" / name
+        if p.exists():
+            return p
+    raise FileNotFoundError(
+        f"Could not find data/processed/{name}. "
+        "Run `python scripts/prep_m5.py` from the repository root first."
+    )
+
+RANDOM_STATE = 42
+
+weekly = pd.read_csv(data_path("m5_weekly.csv"), parse_dates=["week_start"])
+weekly["month"] = weekly["week_start"].dt.month
+weekly["week_of_year"] = weekly["week_start"].dt.isocalendar().week.astype(int)
+weekly["year"] = weekly["week_start"].dt.year
+
+# store_id, cat_id and state_id are categorical. Trees in scikit-learn need numbers,
+# so one-hot encode them. This is why the feature count is larger than it first looks.
+df_enc = pd.get_dummies(weekly, columns=["store_id", "cat_id", "state_id"],
+                        prefix=["store", "cat", "state"])
+
+LAG_FEATURES = ["units_lag1", "units_lag2", "units_lag3", "units_lag4", "units_lag52"]
+FEATURES = (LAG_FEATURES
+            + ["avg_price", "snap_days", "event_days", "month", "week_of_year", "year"]
+            + [c for c in df_enc.columns if c.startswith(("store_", "cat_", "state_"))])
+TARGET = "units"
+
+# Drop rows with missing lag features (the first 52 weeks of each series)
+df = df_enc.dropna(subset=LAG_FEATURES).copy()
+print(f"Modeling dataset: {len(df):,} store-category-week rows, "
+      f"{weekly.groupby(['store_id','cat_id']).ngroups} series, {len(FEATURES)} features")
+```
+
+**The features you have:**
+
+| Group | Columns | Notes |
+|-------|---------|-------|
+| Lags | `units_lag1` … `units_lag4`, `units_lag52` | recent history and the same week last year |
+| Drivers | `avg_price`, `snap_days`, `event_days` | SNAP days and calendar events per week |
+| Calendar | `month`, `week_of_year`, `year` | |
+| Identity | `store_*`, `cat_*`, `state_*` | one-hot; lets the model learn series-specific levels |
+
+---
+
+# Initial Prompt for Codex
+
+::: {.callout-important}
+::: {.callout-note}
+## Your numbers will not match mine, and that is fine
+
+Every result in this course depends on a random seed, and often also on your library
+versions, your hardware, and how many CPU threads your machine uses. Two people running
+identical, correct code will get different numbers — sometimes noticeably different.
+
+**What is graded** is that you used the right model and the right procedure, and that your
+interpretation follows from the numbers *you* actually obtained. Quote your own output.
+
+**What is not graded** is matching any particular value. Do not tune your way toward a number
+you saw on a slide or heard from a classmate — that is the one way to turn this into a wrong
+answer.
+
+One caveat worth knowing. The broad *ordering* of models usually survives this variation. If
+yours comes out backwards from what the lecture found, say so in a sentence and offer a reason:
+either you have found something real about your run, or there is a bug worth hunting. Both are
+worth more marks than quietly reporting a number you do not believe.
+:::
+
+## Initial Prompt for Codex
+
+Paste the block below as the very first message in your Codex session before sending any questions. This sets the context that all subsequent prompts build on and does **not** count against your prompt budget.
+
+```
+I am working on Homework 3 for ECON 8310: Business Forecasting at the University of Nebraska at Omaha.
+
+Dataset: M5/Walmart — weekly aggregated, 30 store-category series (10 stores across CA/TX/WI, 3 categories each), at `data/processed/m5_weekly.csv`. Columns: store_id, cat_id, state_id, week_start, units (target), avg_price, snap_days, event_days, and lagged units (units_lag1 through units_lag4, units_lag52).
+
+This homework covers Decision Trees and Random Forests for sales forecasting using scikit-learn. I will ask you questions one at a time. For each:
+1. Write clean, well-commented Python code that runs end-to-end
+2. Explain what the output means so that I understand it — but do NOT draft the written
+   answers I submit. The interpretation and business-recommendation sections are mine to
+   write, in my own words.
+
+My prompt budget is 12 (this context prompt is excluded). I will label each question before asking.
+
+
+Repository rules — these apply to every prompt in this thread:
+- My submission folder is `submissions/hw03_<my_name>/`. Put everything there.
+- Keep a `PROMPT_LOG.md` in that folder. For every prompt I send, append a block:
+      ### Prompt <n> — YYYY-MM-DD HH:MM
+      <my prompt, verbatim>
+  Numbered from 1, in order. Never edit or delete an earlier entry. If your tool cannot write
+  files, I will paste them in myself.
+- After finishing the work for each prompt, make exactly one git commit:
+  `hw03 prompt <prompt_id>: <short summary>`
+- If a prompt would take me past my budget of 12, do not do the work. Reply exactly
+  PROMPT_LIMIT_REACHED, and still log that prompt.
+- Never modify `AGENTS.md`, anything in `assignments/`, or anything in `policy/`.
+
+Confirm by responding with: HW03_CONTEXT_ACK
+```
+
+Submit this text as **`INITIAL_PROMPT.md`** in your submission folder.
+:::
+
+---
+
+# Questions
+
+## Q1 — Train/Test Split
+
+*(Suggested prompts: 1)*
+
+Time series data has a natural arrow of time: the past is used to predict the future. The starter code below defines a temporal cutoff. Using that cutoff, create `X_train`, `X_test`, `y_train`, and `y_test`. Print the number of rows in each split and the date range covered by each.
+
+```{python}
+cutoff = pd.Timestamp("2015-05-17")     # holds out the final ~53 weeks
+
+# Create train and test splits using the cutoff date
+# Print row counts and date ranges for each split
+```
+
+As a sanity check before modeling, compute the **seasonal-naive benchmark** on the test set:
+predict each store-category-week using `units_lag52` (the same week last year). Every model in
+this assignment should beat it. Report its RMSE and carry the number forward to Q5.
+
+> **Your response:** Why must you use a temporal (not random) split for time series forecasting? What would go wrong with a random split?
+
+---
+
+## Q2 — Decision Tree
+
+*(Suggested prompts: 2)*
+
+Decision trees partition the feature space by asking a sequence of yes/no questions. A shallow tree (small `max_depth`) generalizes broadly but may miss important patterns; a deep tree fits the training data closely but risks overfitting. This question asks you to see both sides of that trade-off directly.
+
+**(a)** Fit a `DecisionTreeRegressor` with `max_depth=3` and `random_state=42` on the training set.
+
+**(b)** Visualize the tree using `plot_tree` with `feature_names=FEATURES` and `filled=True`. Size the figure so the splits are readable.
+
+**(c)** Report test RMSE and the top 5 features by impurity-based importance. Present the importances as a horizontal bar chart, sorted descending.
+
+**(d)** Re-fit with `max_depth=10`. How does test RMSE change? Does the deeper tree help or hurt on the test set?
+
+The `FEATURES` and `TARGET` variables, and the train/test arrays from Q1, are already defined.
+
+```{python}
+# (a) Fit DecisionTreeRegressor with max_depth=3
+# (b) Visualize the tree with plot_tree
+# (c) Report test RMSE and top 5 feature importances
+# (d) Re-fit with max_depth=10 and compare test RMSE
+```
+
+> **Your response:** Look at the top split in the depth-3 tree. What feature does it split on first, and at what threshold? What does that tell you about what drives weekly units — and why is that feature so dominant in a dataset that pools 30 different series?
+
+---
+
+## Q3 — Random Forest
+
+*(Suggested prompts: 2)*
+
+A Random Forest grows many decision trees on bootstrap samples of the data and averages their predictions. By training each tree on a different random subset of rows — and considering only a random subset of features at each split — the ensemble reduces the variance that makes individual deep trees unreliable. One by-product of bootstrap sampling is that roughly one-third of the training rows are left out of each tree: these out-of-bag (OOB) samples can be used to produce an internal validation score without touching the held-out test set.
+
+Fit a `RandomForestRegressor` with `n_estimators=200`, `max_features="sqrt"`, `oob_score=True`, `random_state=42`, and `n_jobs=-1` (uses all cores; the fit takes a few seconds).
+
+**(a)** The `oob_score_` attribute returns an R² value, not RMSE. Convert it to an approximate RMSE using the training target values, and report this OOB RMSE.
+
+**(b)** Report the test RMSE. Compare it to the depth-3 and depth-10 Decision Trees from Q2, and to the seasonal-naive benchmark from Q1.
+
+**(c)** Plot the MDI feature importances as a horizontal bar chart, sorted descending, showing all features.
+
+```{python}
+# Fit RandomForestRegressor with n_estimators=200, max_features="sqrt", oob_score=True
+# (a) Convert oob_score_ (R²) to OOB RMSE
+# (b) Compute and report test RMSE, compare to Q2
+# (c) Plot MDI feature importances, sorted descending
+```
+
+> **Your response:** The Random Forest's OOB RMSE is estimated without using a held-out test set. Explain in plain English how OOB estimation works and why it is a useful property.
+
+---
+
+## Q4 — MDI vs Permutation Importance
+
+*(Suggested prompts: 2)*
+
+MDI importance measures how much each feature reduces impurity across all trees in the forest. It is fast to compute because it is a by-product of training, but it has a known bias: features with many distinct numeric values tend to receive inflated importance scores simply because they offer the splitter more places to cut, not because they carry more information.
+
+Permutation importance avoids this bias by directly measuring how much accuracy degrades when a single feature's values are randomly shuffled on the test set. A feature that matters will cause a large increase in RMSE when shuffled; a redundant or spurious one will cause almost none.
+
+**(a) Plant two controls.** Add two columns of pure noise to the modeling table — one continuous, one binary — and refit the forest with them included:
+
+```{python}
+rng = np.random.RandomState(RANDOM_STATE)
+df["noise_continuous"] = rng.rand(len(df))          # uniform on [0, 1)
+df["noise_binary"] = rng.randint(0, 2, len(df))     # 0 or 1
+
+FEATURES_WITH_NOISE = FEATURES + ["noise_continuous", "noise_binary"]
+
+# Refit the Random Forest (same settings as Q3) using FEATURES_WITH_NOISE
+```
+
+Neither column carries any information about `units` — you generated them from a random number
+generator. Any importance either one receives is an artifact of the method, not a finding.
+
+**(b)** Compute permutation importance on the test set with `n_repeats=10`, `random_state=42`,
+and `scoring="neg_root_mean_squared_error"` so the result is in units rather than R².
+
+**(c)** Build a comparison table for the two noise columns and three real features of your choice,
+showing MDI and permutation importance side by side. Then report **where `noise_continuous`
+ranks by MDI** out of all features, and where `noise_binary` ranks.
+
+**(d)** Produce the side-by-side bar charts: top-10 features by MDI, and top-10 by permutation
+importance, in one figure.
+
+```{python}
+from sklearn.inspection import permutation_importance
+
+# (b) permutation importance on the test set, scored in RMSE units
+# (c) comparison table for noise_continuous, noise_binary, and three real features
+#     plus the MDI rank of each noise column
+# (d) side-by-side top-10 bar charts
+```
+
+> **Your response:** Both noise columns are equally useless by construction. Did MDI treat them equally? Report both MDI values and both ranks, and explain the gap in terms of how many distinct values each column has.
+>
+> Then: did permutation importance treat them correctly? And state the practical rule — when is it safe to read an MDI ranking, and when must you compute permutation importance instead?
+
+---
+
+## Q5 — Walk-Forward Cross-Validation
+
+*(Suggested prompts: 2)*
+
+A single train/test split gives one estimate of generalization error. Walk-forward cross-validation produces multiple estimates by repeatedly expanding the training window and forecasting the next block of weeks. This is the supervised-learning analogue of the rolling-origin evaluation you used for ARIMA in Homework 1, and it guards against the possibility that the single test period happens to be unusually easy or hard to forecast.
+
+The starter code below defines the sequence of cutoff dates. For each cutoff:
+
+1. Use all rows with `week_start < cutoff` as the training set
+2. Use rows with `cutoff <= week_start < cutoff + 13 weeks` as the forecast window
+3. Fit a `DecisionTreeRegressor(max_depth=5, random_state=42)` and a `RandomForestRegressor(n_estimators=100, random_state=42)` on the training set
+4. Compute RMSE for each model on the forecast window
+
+Report the mean RMSE across all CV rounds for each model, and plot the per-round RMSE for both models on a single figure. Add the seasonal-naive benchmark from Q1 as a horizontal reference line.
+
+```{python}
+cutoffs = pd.date_range("2014-01-05", "2015-05-17", freq="13W")   # 6 rounds
+print(f"{len(cutoffs)} CV rounds:", [str(c.date()) for c in cutoffs])
+
+# Walk-forward CV loop over cutoffs
+# At each cutoff: train on all rows before cutoff, test on next 13 weeks
+# Fit DecisionTreeRegressor(max_depth=5) and RandomForestRegressor(n_estimators=100)
+# Collect per-round RMSE for each model
+# Report mean RMSE and plot per-round RMSE
+```
+
+> **Your response:** Does walk-forward CV change your conclusion about which model is better? Why might test-set RMSE and CV RMSE differ — and note that each CV round trains on *less* data than the final model did, so what does that imply about which estimate is more pessimistic?
+
+---
+
+## Q6 — Business Memo
+
+*(Suggested prompts: 0 — write yourself)*
+
+No code required for this question.
+
+You are presenting to a Walmart regional analytics team. They currently plan inventory with a single national uplift factor for SNAP weeks — every store receives the same expected lift, regardless of state, store, or product category. Your Random Forest was trained on all 30 store-category series and includes `snap_days` alongside store, state, and category identifiers.
+
+Write a short memo of 150–200 words addressing three points:
+
+1. What does your model say about the value of SNAP timing — is `snap_days` consistently among the most important drivers of weekly units, or does its importance depend on how you measure importance? Be specific about which measure you are quoting.
+2. How could the model help decide **which store-category combinations** to stock up for a given SNAP week, rather than applying one uplift nationwide?
+3. Identify one meaningful limitation the team should understand before relying on this model for inventory planning. The dominance of `units_lag1` is a reasonable place to start: what does a model that leans that heavily on last week's value do when next week is *not* like last week?
+
+> **Your response:**
+
+---
+
+# Submission Checklist
+
+Before submitting, confirm each item below is complete.
+
+- [ ] All code cells run without errors from a clean kernel restart
+- [ ] Written responses completed in your own words (not copied from Codex output)
+- [ ] `INITIAL_PROMPT.md` saved in your submission folder
+- [ ] `PROMPT_LOG.md` complete with 12 or fewer entries
+- [ ] One git commit per Codex prompt, with message format `hw03 prompt <id>: <summary>`
+- [ ] `REPORT.md` containing a plain-English business recommendation (one paragraph)

@@ -24,5 +24,12 @@ env/
 # Data artifacts
 data/raw/*
 !data/raw/.gitkeep
+# data/processed/ ships with the course now (see STUDENT_QUICKSTART.md).
+# The five prepared datasets are committed; anything else a student writes here is not.
 data/processed/*
 !data/processed/.gitkeep
+!data/processed/m5_weekly.csv
+!data/processed/m5_daily.csv
+!data/processed/fred_monthly.csv
+!data/processed/electricity_daily.csv
+!data/processed/electricity_hourly.csv

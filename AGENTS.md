@@ -1,49 +1,60 @@
 # AGENTS.md
 
-## Repository Intent
-This repository is a shared coding-homework environment for a graduate forecasting class.  
-Students run Codex locally against this repo.
+Instructions for any AI assistant working in this repository.
 
-## Agent Priorities
-- Follow assignment instructions exactly before adding extras.
-- Keep solutions reproducible and easy to grade.
-- Explain technical outputs in business language.
-- Make assumptions explicit and checkable.
+## What this repository is
 
-## Audience Standard
-- MBA: concise business interpretation and decision impact.
-- Data Science: clear methods, metrics, and code quality.
-- Economics: defensible assumptions and economic rationale.
+Homework for ECON 8310: Business Forecasting (University of Nebraska at Omaha). A student copies
+an assignment out of `assignments/`, completes it in `submissions/`, and submits it.
 
-## Folder Contract
-- `assignments/`: official prompts, rubrics, and templates.
-- `submissions/`: student or team deliverables by homework.
-- `data/raw/`: course-provided data, never edited in place.
-- `data/processed/`: student-generated cleaned data.
-- `notebooks/`: exploratory and analysis notebooks.
-- `src/`: reusable code utilities.
+## The rule that matters most
 
-## Working Rules
-- Do not modify assignment prompts unless asked by instructor.
-- Do not overwrite raw data files.
-- Prefer small, auditable changes over large rewrites.
-- Keep dependency/setup assumptions inside each assignment deliverable.
-- Do not commit secrets, tokens, or private datasets.
-- Keep `PROMPT_LOG.jsonl` current with every student prompt in each homework folder.
-- Keep `INITIAL_PROMPT.md` as the exact required initial contract prompt.
-- Create one git commit after each prompt with commit message including the prompt id.
+**Do not write the student's interpretations.**
 
-## Deliverable Minimum
-Each homework submission should include:
-- a reproducible analysis artifact (`.ipynb` and/or `.py`),
-- `INITIAL_PROMPT.md`,
-- `PROMPT_LOG.jsonl`,
-- a short `REPORT.md` covering objective, method, results, and recommendation,
-- at least one baseline model and one comparison model,
-- evaluation metrics with brief interpretation.
+Help with code freely. Explain what output means so the student understands it. But the
+interpretation sections, the business recommendations, and the reflection questions must be
+written by the student, in their own words. Those sections are what the assignment is actually
+assessing.
 
-## Naming Conventions
-- Submission folder: `submissions/hwNN_<student_or_team_name>/`
-- Notebook: `hwNN_<topic>.ipynb`
-- Report: `REPORT.md`
-- Scripts/modules: lowercase snake_case
+If asked to draft one, explain the result instead and let the student write it.
+
+## Working practices
+
+- Follow the assignment's instructions exactly before adding anything extra.
+- Write code that runs end-to-end. The student will run it themselves.
+- Time-series discipline: never shuffle time-ordered data, split by time rather than at random,
+  and compute scaling statistics on the training portion only. These errors do not raise
+  exceptions — they silently produce better-looking numbers.
+- Set random seeds where the assignment specifies one.
+- Make assumptions explicit.
+
+## The prompt log
+
+Each assignment asks the student to keep a `PROMPT_LOG.md` in their submission folder, one
+numbered entry per prompt:
+
+```markdown
+### Prompt 1 — YYYY-MM-DD HH:MM
+<the prompt, verbatim>
+```
+
+If you can write files, append to it before you respond. If you cannot, remind the student to
+add the entry themselves.
+
+## Budgets
+
+Each assignment states a prompt budget. It is a **target, not a hard limit** — going over is
+allowed, and the student should note where they got stuck. Do not refuse to help a student who
+has gone over.
+
+## Read-only
+
+Never modify `assignments/`, `policy/`, or this file. Student work belongs in `submissions/`.
+
+## Folder contract
+
+- `assignments/` — the eleven assignments, read-only
+- `data/processed/` — prepared datasets, already built
+- `scripts/` — data preparation and the submission checker
+- `submissions/` — student work, one folder per assignment
+- `policy/` — budgets and read-only paths

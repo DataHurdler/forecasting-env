@@ -1,54 +1,74 @@
-# Forecasting-Env
+# ECON 8310 — Homework Repository
 
-GitHub classroom repository for graduate business forecasting homework.  
-Students clone this repo to their own machines and use Codex as their coding assistant.
+Business Forecasting · University of Nebraska at Omaha · Fall 2026
 
-## Purpose
-- Central place for coding homework and project submissions.
-- Shared structure across MBA, Data Science, and Economics students.
-- Consistent standards for reproducibility and business interpretation.
+**New here? Read [STUDENT_QUICKSTART.md](STUDENT_QUICKSTART.md).**
 
-## Student Start (Codex-first)
-1. Clone your course repo copy locally.
-   If you downloaded a zip instead, run `git init` in the repo before using Codex.
-2. Open the folder in Codex.
-3. Read `AGENTS.md` before starting work.
-4. Send the exact required initial prompt in `prompts/REQUIRED_INITIAL_PROMPT.md`.
-5. Open the current assignment in `assignments/`.
-6. Complete code and writeup in your assignment folder.
-7. Commit and push your work.
+Course website: <https://datahurdler.github.io/Forecasting-Course/>
 
-## Repository Structure
-- `AGENTS.md`: repository rules for students and coding agents.
-- `assignments/`: assignment prompts, templates, and rubrics.
-- `submissions/`: student work folders by assignment.
-- `prompts/`: required prompt text students must use to initialize Codex.
-- `policy/`: instructor policy (prompt limits, locked paths).
-- `scripts/validate_submission.py`: instructor-side validation script.
-- `data/raw/`: provided datasets (read-only source copies).
-- `data/processed/`: cleaned datasets created by students.
-- `notebooks/`: exploratory and analysis notebooks.
-- `src/`: reusable code modules.
+---
 
-## Suggested Homework Flow
-1. Start from `assignments/HW_TEMPLATE.md`.
-2. Create a folder like `submissions/hw01_<student_or_team_name>/`.
-3. Add code in notebooks and/or `src/`.
-4. Keep `INITIAL_PROMPT.md` and `PROMPT_LOG.jsonl` in the submission folder.
-5. Create one git commit after each prompt with message: `hwNN prompt <id>: <short summary>`.
-6. Keep prompt usage within the assignment limit (excluding the initial contract prompt).
-7. Include a short `REPORT.md` with business conclusions.
-8. Push changes with clear commit messages.
+## What is in here
 
-## Notes for Instructors
-- Keep assignment prompts and grading rubrics inside `assignments/`.
-- Use a common naming convention for easy grading and automation.
-- Keep datasets versioned and documented.
-- For strict commit-per-prompt enforcement, validate against a student git repo (not a zip copy without `.git`).
-- Validate submissions against your canonical repo copy:
-  ```bash
-  python scripts/validate_submission.py \
-    --student-root /path/to/student/repo \
-    --reference-root /path/to/this/canonical/repo \
-    --homework hw01
-  ```
+| Folder | What it holds |
+|---|---|
+| `assignments/` | The eleven homework assignments, as `.qmd` files. Copy one out; do not edit it in place. |
+| `data/processed/` | The prepared datasets every assignment reads. Already built for you. |
+| `scripts/` | Data preparation, and `check_my_submission.py` to run before you push. |
+| `submissions/` | Your work. One folder per assignment. |
+| `policy/` | Prompt budgets and read-only paths. |
+| `AI_POLICY.md` | How to use an AI assistant on this course. Read it once. |
+
+---
+
+## The short version
+
+1. Copy the assignment from `assignments/` into `submissions/<assignment>_<yourname>/`
+2. Send its **Initial Prompt** to your AI assistant; save it as `INITIAL_PROMPT.md`
+3. Do the work, keeping a `PROMPT_LOG.md` as you go
+4. `quarto render` your `.qmd`
+5. `python scripts/check_my_submission.py`
+6. Commit and push — or upload through github.com if you prefer
+
+---
+
+## Folder naming
+
+Name your folder for the assignment exactly as the assignment names itself, then your name:
+
+```
+submissions/hw01_part1_jsmith/
+submissions/hw05_part2_jsmith/
+submissions/hw07_jsmith/
+```
+
+Each submission folder should end up containing:
+
+- your completed `.qmd`
+- the rendered `.html`
+- `PROMPT_LOG.md`
+- `INITIAL_PROMPT.md`
+- `REPORT.md`, where the assignment asks for one
+
+`check_my_submission.py` verifies all of this.
+
+---
+
+## Do not edit
+
+`assignments/`, `policy/`, and `AGENTS.md` are read-only. If you think something in them is wrong,
+tell me — you may well be right, but do not fix it locally, because your grade is checked against
+the originals.
+
+---
+
+## For instructors
+
+Validate a student repository against this canonical copy:
+
+```bash
+python scripts/validate_submission.py \
+  --student-root /path/to/student/repo \
+  --reference-root . \
+  --homework hw01_part1
+```

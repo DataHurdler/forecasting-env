@@ -1,0 +1,296 @@
+---
+title: "Homework 5: Deep Learning for Time Series"
+subtitle: "ECON 8310: Business Forecasting — University of Nebraska at Omaha · Fall 2026"
+author: "Your Name"
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    code-fold: false
+    self-contained: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+> **Due **Week 9**. Covers the feedforward and convolutional models, and the window-length experiment.**
+
+---
+
+::: {.callout-note}
+## Your numbers will not match mine, and that is fine
+
+Every result in this course depends on a random seed, and often also on your library
+versions, your hardware, and how many CPU threads your machine uses. Two people running
+identical, correct code will get different numbers — sometimes noticeably different.
+
+**What is graded** is that you used the right model and the right procedure, and that your
+interpretation follows from the numbers *you* actually obtained. Quote your own output.
+
+**What is not graded** is matching any particular value. Do not tune your way toward a number
+you saw on a slide or heard from a classmate — that is the one way to turn this into a wrong
+answer.
+
+One caveat worth knowing. The broad *ordering* of models usually survives this variation. If
+yours comes out backwards from what the lecture found, say so in a sentence and offer a reason:
+either you have found something real about your run, or there is a bug worth hunting. Both are
+worth more marks than quietly reporting a number you do not believe.
+:::
+
+## Overview
+
+This homework builds four neural network architectures for time series forecasting,
+progressing from simple to complex:
+
+1. **Feedforward Network (FFN)** — treats lagged sales as a flat feature vector
+2. **1D Convolutional Network (CNN)** — slides a learned filter across the sequence
+   to detect local temporal patterns
+3. **LSTM** — processes the sequence step-by-step, maintaining a memory of past states
+4. **Transformer** — attends to all time steps simultaneously, learning which past
+   weeks are most informative
+
+All four are implemented in PyTorch using the same sliding-window dataset infrastructure,
+making it straightforward to compare them on identical train/test splits.
+
+**Learning objectives:**
+
+- Build a PyTorch `Dataset` and `DataLoader` for sliding-window time series data
+- Train FFN, CNN, LSTM, and Transformer models and monitor loss curves
+- Compare all four architectures on holdout RMSE
+- Synthesize results across all five homeworks into a full course comparison
+
+---
+
+## Dataset and Setup
+
+We construct fixed-length sliding windows over each store-category series. Each input is a window
+of past weeks; the target is the next week's units. **Part A** (FFN, CNN) uses a 26-week window;
+**Part B** (RNN, LSTM, Transformer) uses 52 weeks, so the sequence models get a full annual cycle.
+
+```{python}
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import math
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
+from sklearn.metrics import mean_squared_error
+import warnings
+warnings.filterwarnings('ignore')
+
+from pathlib import Path
+
+def data_path(name):
+    for base in (Path.cwd(), *Path.cwd().parents):
+        p = base / "data" / "processed" / name
+        if p.exists():
+            return p
+    raise FileNotFoundError(
+        f"Could not find data/processed/{name}. "
+        "Run `python scripts/prep_m5.py` from the repository root first."
+    )
+
+RANDOM_STATE = 42
+torch.manual_seed(RANDOM_STATE)
+np.random.seed(RANDOM_STATE)
+
+weekly = (pd.read_csv(data_path("m5_weekly.csv"), parse_dates=["week_start"])
+            .sort_values(["store_id", "cat_id", "week_start"]))
+weekly["series"] = weekly.store_id + "_" + weekly.cat_id
+
+# The four channels every window carries through time
+CHANNELS = ["units", "snap_days", "event_days", "avg_price"]
+
+CUTOFF = pd.Timestamp("2015-05-17")     # same split as Homework 3 and 4
+
+print(f"{weekly.series.nunique()} series | "
+      f"{weekly.week_start.min().date()} to {weekly.week_start.max().date()} | "
+      f"{len(weekly):,} rows")
+```
+
+**Building the windows.** For each series, slide a window of length `W` along the history: the
+window is the input, the units in week `W+1` is the target. A window belongs to the training set
+if its *target* week falls before the cutoff.
+
+::: {.callout-warning}
+## Two mistakes that will not raise an error
+
+**Do not shuffle.** `DataLoader(..., shuffle=False)` for every model here. Shuffling destroys the
+ordering the sequence models exist to exploit, and it will not warn you.
+
+**Standardize using training statistics only.** Compute the mean and standard deviation on the
+training windows, then apply them to the test windows. Computing them over the full dataset leaks
+the test period into training — the same error as scaling outside a CV fold in Homework 4.
+:::
+
+---
+
+## Initial Prompt for Codex
+
+::: {.callout-important}
+## Initial Prompt for Codex
+
+Paste the following as your first message to Codex. Save it as `INITIAL_PROMPT.md`
+in your submission folder.
+
+```
+I am working on Homework 5 Part 1 for ECON 8310: Business Forecasting at the
+University of Nebraska at Omaha.
+
+Dataset: M5/Walmart — weekly aggregated, 30 store-category series, at
+`data/processed/m5_weekly.csv`. Columns: store_id, cat_id, state_id,
+week_start, units (target), avg_price, snap_days, event_days, and lagged
+units. I build sliding windows over each series: 26 weeks for Part A and
+52 weeks for Part B, with four channels (units, snap_days, event_days,
+avg_price). Temporal split at 2015-05-17, matching Homework 3 and 4.
+
+This homework covers four neural network architectures for time series
+forecasting: FFN, 1D CNN, LSTM, and Transformer encoder (all in PyTorch).
+I will ask you questions one at a time. For each:
+1. Write clean, well-commented PyTorch code that runs end-to-end
+2. Explain what the output means so that I understand it — but do NOT draft the written
+   answers I submit. The interpretation and business-recommendation sections are mine to
+   write, in my own words.
+
+My prompt budget for Part 1 is 9 (this context prompt is excluded). I will label
+each question before asking.
+
+
+Repository rules — these apply to every prompt in this thread:
+- My submission folder is `submissions/hw05_part1_<my_name>/`. Put everything there.
+- Keep a `PROMPT_LOG.md` in that folder. For every prompt I send, append a block:
+      ### Prompt <n> — YYYY-MM-DD HH:MM
+      <my prompt, verbatim>
+  Numbered from 1, in order. Never edit or delete an earlier entry. If your tool cannot write
+  files, I will paste them in myself.
+- After finishing the work for each prompt, make exactly one git commit:
+  `hw05_part1 prompt <prompt_id>: <short summary>`
+- If a prompt would take me past my budget of 9, do not do the work. Reply exactly
+  PROMPT_LIMIT_REACHED, and still log that prompt.
+- Never modify `AGENTS.md`, anything in `assignments/`, or anything in `policy/`.
+
+Confirm by responding with: HW05P1_CONTEXT_ACK
+```
+:::
+
+---
+
+## Part A: FFN and CNN (window = 26 weeks)
+
+### Q1 — Windows, Dataset and DataLoader *(Suggested prompts: 3)*
+
+Implement a `SeriesWindowDataset` that turns the panel into supervised windows.
+
+- For each of the 30 series, slide a window of length `W` along the history
+- `x`: the window, shape `(W, 4)` — the four channels in `CHANNELS`
+- `y`: `units` in the following week
+- A window is **training** if its target week falls before `CUTOFF`
+
+Standardize each channel using **training statistics only**, and standardize `y` the same way.
+Build `DataLoader`s with `batch_size=64` and **`shuffle=False` for both**.
+
+```{python}
+WINDOW_A = 26
+
+class SeriesWindowDataset(Dataset):
+    def __init__(self, df, channels, window, stats=None):
+        # TODO: build windows per series; return (x, y) as float32 tensors
+        pass
+
+    def __len__(self):
+        pass
+
+    def __getitem__(self, idx):
+        pass
+
+# Instantiate train and test datasets + dataloaders
+```
+
+> **Your response:** How many training windows do you get? It is *fewer* than the number of
+> store-category-week rows before the cutoff — work out exactly how many you lose and explain
+> where they go. (Hint: what has to exist before a window can start?) Then: why `shuffle=False`
+> here, when almost every PyTorch tutorial you will find sets it to `True`?
+
+---
+
+### Q2 — Feedforward Network *(Suggested prompts: 2)*
+
+Flatten the window to a vector of length `W × 4` and feed it to a plain network:
+`Linear(W*4 → 128)`, ReLU, `Dropout(0.2)`, `Linear(128 → 64)`, ReLU, `Dropout(0.2)`,
+`Linear(64 → 1)`.
+
+Train 30 epochs, Adam `lr=1e-3`, `weight_decay=1e-4`, MSE loss. Plot the loss curve and report
+test RMSE in **original units** (invert the standardization before computing RMSE).
+
+```{python}
+class FFNForecaster(nn.Module):
+    def __init__(self, window, n_channels):
+        super().__init__()
+        # TODO
+
+    def forward(self, x):        # x: (batch, window, channels)
+        # TODO
+        pass
+
+# Training loop (30 epochs)
+```
+
+> **Your response:** Flattening throws away the fact that the window is ordered — the model cannot
+> tell week 1 from week 26 except by position in a vector. Given that, how does its RMSE compare to
+> the XGBoost result you recorded in Homework 4, which had the same disadvantage?
+
+---
+
+### Q3 — 1D Convolutional Network *(Suggested prompts: 2)*
+
+Build a `CNNForecaster`: `Conv1d(4, 32, kernel_size=5)`, ReLU, `Conv1d(32, 64, kernel_size=3)`,
+ReLU, then **flatten** and a final `Linear` to one output.
+
+Note the input shape: `Conv1d` expects `(batch, channels, time)`, so you must transpose the
+`(batch, time, channels)` tensors from your DataLoader.
+
+Train as in Q2 and report test RMSE.
+
+```{python}
+class CNNForecaster(nn.Module):
+    def __init__(self, n_channels):
+        super().__init__()
+        # TODO
+
+    def forward(self, x):        # remember the transpose
+        # TODO
+        pass
+```
+
+> **Your response:** Lecture 8 measured roughly a 500-RMSE penalty for replacing `Flatten` with
+> `AdaptiveAvgPool1d(1)`. Explain in one or two sentences *why* pooling costs accuracy here, in
+> terms of what the pooling operation discards.
+
+---
+
+### Q4 — Receptive Field and Window Length *(Suggested prompts: 2)*
+
+Retrain the CNN at windows of **13, 26 and 52** weeks. Report test RMSE for each.
+
+```{python}
+# Retrain CNN for each window length; collect RMSE
+```
+
+> **Your response:** Does a longer window always help? Your two convolution layers see about
+> seven weeks of context regardless of how long the window is — explain how that limits what a
+> longer window can buy, and what you would change architecturally to use a 52-week window
+> properly.
+
+---
+
+## Submission Checklist
+
+- [ ] All code cells run without errors from top to bottom
+- [ ] Written responses completed in your own words
+- [ ] `INITIAL_PROMPT.md` saved in `submissions/hw05_part1_<your_name>/`
+- [ ] `PROMPT_LOG.md` complete with **9 or fewer** entries for Part 1
+- [ ] One git commit per Codex prompt (`hw05_part1 prompt <id>: <short summary>`)

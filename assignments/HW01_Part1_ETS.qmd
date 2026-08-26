@@ -1,0 +1,207 @@
+---
+title: "Homework 1, Part 1: Exponential Smoothing"
+subtitle: "ECON 8310: Business Forecasting — University of Nebraska at Omaha · Fall 2026"
+author: "Your Name"
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    code-fold: false
+    self-contained: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+# Overview
+
+Homework 1 comes in two parts. **Part 1 (this document)** covers exponential smoothing and is due before class in Week 2 — it uses only material from Lecture 1. **Part 2** covers ARIMA, VAR, and method comparison, and is due before class in Week 3, after Lecture 2.
+
+Each part has its own Codex context prompt, its own prompt budget, and its own submission. Do not start Part 2 until Part 1 is submitted.
+
+Exponential smoothing is a workhorse of operational forecasting in retail and supply chain: interpretable, cheap to fit, and hard to beat at scale. Working through real store-level sales data, you will see how the choice of smoothing model and the rigor of evaluation translate directly into business decisions.
+
+**Learning objectives.** By the end of Part 1 you will be able to:
+
+- Read a retail time series plot for trend, seasonality, and business-driven irregularity
+- Apply Simple Exponential Smoothing, Holt's linear trend model, and Holt-Winters to seasonal weekly data
+- Interpret the smoothing parameter $\alpha$ in business terms
+- Compare competing models on a held-out test set using RMSE and MAE, against a benchmark
+
+---
+
+# Dataset
+
+This course runs on the **M5 / Walmart** dataset — the spine described in `ECON8310_Datasets.md`. It covers daily unit sales for Walmart stores across California, Texas, and Wisconsin from **29 January 2011 to 22 May 2016**, and it was the data for the M5 forecasting competition.
+
+You will work with the prepared weekly file, `data/processed/m5_weekly.csv`: **30 series** (10 stores × 3 product categories), **277 weeks each**, with average price, SNAP benefit days, and event-day counts alongside the unit sales.
+
+If the file does not exist, run `python scripts/prep_m5.py` once first — it will tell you where to get the raw download.
+
+```{python}
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from statsmodels.tsa.holtwinters import ExponentialSmoothing
+import warnings
+warnings.filterwarnings('ignore')
+
+from pathlib import Path
+
+def data_path(name):
+    """Find the processed data file whether you render from the repo root or from
+    this file's own folder."""
+    for base in (Path.cwd(), *Path.cwd().parents):
+        p = base / "data" / "processed" / name
+        if p.exists():
+            return p
+    raise FileNotFoundError(
+        f"Could not find data/processed/{name}. "
+        "Run `python scripts/prep_m5.py` from the repository root first."
+    )
+
+weekly = pd.read_csv(data_path("m5_weekly.csv"), parse_dates=["week_start"])
+
+# Store CA_1, FOODS category, for the univariate models in Part 1
+ca1 = (weekly[(weekly.store_id == "CA_1") & (weekly.cat_id == "FOODS")]
+       .set_index("week_start")["units"]
+       .sort_index())
+
+print(f"CA_1 FOODS: {len(ca1)} weekly observations "
+      f"from {ca1.index.min().date()} to {ca1.index.max().date()}")
+```
+
+---
+
+# Initial Prompt for Codex
+
+::: {.callout-important}
+::: {.callout-note}
+## Your numbers will not match mine, and that is fine
+
+Every result in this course depends on a random seed, and often also on your library
+versions, your hardware, and how many CPU threads your machine uses. Two people running
+identical, correct code will get different numbers — sometimes noticeably different.
+
+**What is graded** is that you used the right model and the right procedure, and that your
+interpretation follows from the numbers *you* actually obtained. Quote your own output.
+
+**What is not graded** is matching any particular value. Do not tune your way toward a number
+you saw on a slide or heard from a classmate — that is the one way to turn this into a wrong
+answer.
+
+One caveat worth knowing. The broad *ordering* of models usually survives this variation. If
+yours comes out backwards from what the lecture found, say so in a sentence and offer a reason:
+either you have found something real about your run, or there is a bug worth hunting. Both are
+worth more marks than quietly reporting a number you do not believe.
+:::
+
+## Initial Prompt for Codex
+
+Paste the block below as the very first message in your Codex session before sending any questions. This sets the context that all subsequent prompts build on and does **not** count against your prompt budget.
+
+```
+I am working on Homework 1, Part 1 for ECON 8310: Business Forecasting at the University of Nebraska at Omaha.
+
+Dataset: M5 / Walmart weekly sales, prepared at `data/processed/m5_weekly.csv`. Columns: store_id (10 Walmart stores across CA, TX, WI), cat_id (FOODS, HOBBIES, HOUSEHOLD), state_id, week_start, units, avg_price, snap_days, event_days, and lag features (units_lag1 through units_lag52). There are 30 store-category series, each with 277 weekly observations covering January 2011 to May 2016.
+
+Part 1 covers exponential smoothing only (SES, Holt, Holt-Winters) using Python and statsmodels, on the CA_1 FOODS series. ARIMA and VAR come in Part 2 — do not introduce them here. I will ask you questions one at a time. For each:
+1. Write clean, well-commented Python code that runs end-to-end
+2. Explain what the output means so that I understand it — but do NOT draft the written
+   answers I submit. The interpretation and business-recommendation sections are mine to
+   write, in my own words.
+
+My prompt budget for Part 1 is 4 (this context prompt is excluded). I will label each question before asking.
+
+
+Repository rules — these apply to every prompt in this thread:
+- My submission folder is `submissions/hw01_part1_<my_name>/`. Put everything there.
+- Keep a `PROMPT_LOG.md` in that folder. For every prompt I send, append a block:
+      ### Prompt <n> — YYYY-MM-DD HH:MM
+      <my prompt, verbatim>
+  Numbered from 1, in order. Never edit or delete an earlier entry. If your tool cannot write
+  files, I will paste them in myself.
+- After finishing the work for each prompt, make exactly one git commit:
+  `hw01_part1 prompt <prompt_id>: <short summary>`
+- If a prompt would take me past my budget of 4, do not do the work. Reply exactly
+  PROMPT_LIMIT_REACHED, and still log that prompt.
+- Never modify `AGENTS.md`, anything in `assignments/`, or anything in `policy/`.
+
+Confirm by responding with: HW01P1_CONTEXT_ACK
+```
+
+Submit this text as **`INITIAL_PROMPT.md`** in your Part 1 submission folder.
+:::
+
+---
+
+# Questions
+
+## Q1 — Exploratory Plot
+
+*(Suggested prompts: 1)*
+
+Plot CA_1 FOODS weekly unit sales over the full 277-week window. After examining the plot, answer the written questions below.
+
+```{python}
+# Plot CA_1 FOODS weekly units over time
+```
+
+> **Your response:** Describe what you see. Is there a trend, and roughly how large is it over the five years? Is there a repeating annual pattern, and where do the peaks fall? Identify at least one irregular spike or dip and propose a business explanation — the dataset includes SNAP benefit days and event flags, and Walmart food sales respond to both.
+
+---
+
+## Q2 — Exponential Smoothing Models
+
+*(Suggested prompts: 2)*
+
+Hold out the final **52 weeks** as a test set. Fit the three models below on the training portion, forecast across the test period, and compute RMSE and MAE for each.
+
+- **Simple Exponential Smoothing (SES)**
+- **Holt's linear trend model**
+- **Holt-Winters (additive seasonality, period = 52)**
+
+Also compute the same two metrics for a **seasonal naive** benchmark — this week last year — so you can tell whether any of the three models is earning its complexity. Present all four rows in one summary table.
+
+::: {.callout-note}
+## Why a 52-week test set works here
+
+Holt-Winters must estimate a seasonal index for each of the 52 weeks in a year, and it needs **at least two complete cycles** — $2m = 104$ observations — before it can initialize them. This is the $2m$ rule from Lecture 1.
+
+Each series has 277 weeks. Holding out 52 still leaves 225 for training, comfortably above the threshold, and a one-year holdout is the horizon a demand planner actually cares about. The assertion below makes the constraint explicit rather than letting it fail deep inside statsmodels.
+:::
+
+```{python}
+N_TEST = 52                                   # final year held out
+train, test = ca1.iloc[:-N_TEST], ca1.iloc[-N_TEST:]
+
+SEASONAL_PERIOD = 52
+assert len(train) >= 2 * SEASONAL_PERIOD, (
+    f"Training set has {len(train)} weeks but Holt-Winters with period "
+    f"{SEASONAL_PERIOD} needs at least {2 * SEASONAL_PERIOD}. "
+    f"Reduce N_TEST."
+)
+print(f"train: {len(train)} weeks   test: {len(test)} weeks")
+
+# Fit SES, Holt, and Holt-Winters; add a seasonal naive benchmark;
+# compute RMSE and MAE for all four
+```
+
+> **Your response:** Which model performs best, and does it beat the seasonal naive benchmark? This series trends upward over the sample — explain what that implies for SES specifically, given that SES produces a flat forecast. Then interpret the estimated $\alpha$: what does its value say about how quickly CA_1 food sales respond to recent weeks, and what would you tell a demand planner who wanted to know how much weight the model puts on last week?
+
+---
+
+# Submission Checklist
+
+Before submitting Part 1, confirm each item below.
+
+- [ ] All code cells run without errors from top to bottom (Kernel → Restart & Run All)
+- [ ] Written responses are completed in your own words — AI-generated prose is not accepted for written sections
+- [ ] `INITIAL_PROMPT.md` is saved in your Part 1 submission folder
+- [ ] `PROMPT_LOG.md` is complete with **4 or fewer** entries (one entry per Codex prompt sent)
+- [ ] One git commit per Codex prompt used, following the format: `hw01_part1 prompt <id>: <one-line summary>`
+
+*Part 2 is due before class in Week 3 and carries its own prompt budget. The business recommendation `REPORT.md` is submitted with Part 2, once you have results from all five questions.*

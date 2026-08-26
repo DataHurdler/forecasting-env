@@ -1,0 +1,383 @@
+---
+title: "Homework 7: Bayesian Linear Regression"
+subtitle: "ECON 8310: Business Forecasting — University of Nebraska at Omaha · Fall 2026"
+author: "Your Name"
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    code-fold: false
+    self-contained: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+::: {.callout-note}
+## Your numbers will not match mine, and that is fine
+
+Every result in this course depends on a random seed, and often also on your library
+versions, your hardware, and how many CPU threads your machine uses. Two people running
+identical, correct code will get different numbers — sometimes noticeably different.
+
+**What is graded** is that you used the right model and the right procedure, and that your
+interpretation follows from the numbers *you* actually obtained. Quote your own output.
+
+**What is not graded** is matching any particular value. Do not tune your way toward a number
+you saw on a slide or heard from a classmate — that is the one way to turn this into a wrong
+answer.
+
+One caveat worth knowing. The broad *ordering* of models usually survives this variation. If
+yours comes out backwards from what the lecture found, say so in a sentence and offer a reason:
+either you have found something real about your run, or there is a bug worth hunting. Both are
+worth more marks than quietly reporting a number you do not believe.
+:::
+
+## Overview
+
+Bayesian linear regression replaces OLS point estimates with full posterior
+distributions over every coefficient. Instead of asking "Is beta significant at
+p < 0.05?", you ask "What is the probability that this effect is positive?" and
+"Is the effect large enough to matter for business decisions?"
+
+This final homework fits a Bayesian regression model for store sales as a function
+of promotions, competition, and store characteristics. It also introduces Directed
+Acyclic Graphs (DAGs) as a tool for deciding which variables to include and how to
+interpret the coefficients causally.
+
+**Learning objectives:**
+
+- Draw and interpret a DAG for a business forecasting model
+- Specify weakly informative priors for regression coefficients
+- Read posterior coefficient distributions (HDI, probability of direction)
+- Apply ROPE analysis to distinguish statistical from practical significance
+- Use posterior samples to simulate conditional scenarios
+
+---
+
+## Dataset and Setup
+
+The question for this assignment is a causal one: **how much does demand respond to price?**
+That is an elasticity, and it is the number a category manager would actually act on.
+
+```{python}
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import pymc as pm
+import arviz as az
+import statsmodels.api as sm
+import warnings, logging
+warnings.filterwarnings('ignore')
+logging.getLogger('pymc').setLevel(logging.ERROR)
+
+from pathlib import Path
+
+def data_path(name):
+    for base in (Path.cwd(), *Path.cwd().parents):
+        p = base / "data" / "processed" / name
+        if p.exists():
+            return p
+    raise FileNotFoundError(
+        f"Could not find data/processed/{name}. "
+        "Run `python scripts/prep_m5.py` from the repository root first."
+    )
+
+RANDOM_STATE = 42
+
+weekly = (pd.read_csv(data_path("m5_weekly.csv"), parse_dates=["week_start"])
+            .sort_values(["store_id", "cat_id", "week_start"]))
+weekly["series"] = weekly.store_id + "_" + weekly.cat_id
+
+df = weekly.dropna(subset=["units", "avg_price"]).copy()
+df["ly"] = np.log(df.units.clip(lower=1))          # log units
+df["lp"] = np.log(df.avg_price)                     # log price
+df["t"]  = (df.week_start - df.week_start.min()).dt.days / 365.25
+df["snap"]  = (df.snap_days >= 5).astype(float)     # high-SNAP week
+df["event"] = (df.event_days > 0).astype(float)     # any event that week
+codes, uniq = pd.factorize(df.series)
+df["idx"] = codes
+J = len(uniq)
+
+# Centre log price within series. NOT standardized -- see the note below.
+df["lpc"] = df.lp - df.groupby("series").lp.transform("mean")
+
+print(f"{len(df):,} rows | {J} series | "
+      f"price range {df.avg_price.min():.2f}-{df.avg_price.max():.2f}")
+```
+
+**Why logs on both sides.** With `ly` and `lp` both logged, the price coefficient is an
+**elasticity**: the percentage change in units for a one percent change in price. That is
+directly interpretable, and it is what makes the scenario analysis in Q6 possible.
+
+::: {.callout-important}
+## Do not standardize log price
+
+It is a common reflex, and here it is a trap. Dividing `lp` by its standard deviation rescales
+the coefficient into "per standard deviation of log price" — which is **no longer an elasticity**,
+and every percentage claim you build on it in Q6 will be wrong by the factor you divided by.
+Leave `lp` in log units. Every predictor in this assignment is already on a scale a manager reads
+directly: log price in percent, `snap` and `event` as 0/1, `t` in years.
+
+Centring within series (`lpc`) is different and is fine — it shifts the variable without
+rescaling it, leaves the elasticity untouched, and greatly improves sampling, because price
+levels differ across series and otherwise correlate with the intercepts.
+:::
+
+---
+
+## Initial Prompt for Codex
+
+::: {.callout-important}
+## Initial Prompt for Codex
+
+Paste the following as your first message to Codex. Save it as `INITIAL_PROMPT.md`
+in your submission folder.
+
+```
+I am working on Homework 7 for ECON 8310: Business Forecasting at the
+University of Nebraska at Omaha.
+
+Dataset: M5/Walmart — weekly aggregated, 30 store-category series, at
+`data/processed/m5_weekly.csv`. Columns: store_id, cat_id, state_id,
+week_start, units, avg_price, snap_days, event_days. I work with log units
+(ly) on log price (lp), plus a trend and series identifiers.
+
+This homework covers Bayesian linear regression using PyMC (v4+),
+including DAGs, posterior coefficient interpretation, ROPE analysis,
+and conditional scenario simulation. I will ask you questions one at
+a time. For each:
+1. Write clean, well-commented PyMC code that runs end-to-end
+2. Explain what the output means so that I understand it — but do NOT draft the written
+   answers I submit. The interpretation and business-recommendation sections are mine to
+   write, in my own words.
+
+My prompt budget is 16 (this context prompt is excluded). I will label
+each question before asking.
+
+
+Repository rules — these apply to every prompt in this thread:
+- My submission folder is `submissions/hw07_<my_name>/`. Put everything there.
+- Keep a `PROMPT_LOG.md` in that folder. For every prompt I send, append a block:
+      ### Prompt <n> — YYYY-MM-DD HH:MM
+      <my prompt, verbatim>
+  Numbered from 1, in order. Never edit or delete an earlier entry. If your tool cannot write
+  files, I will paste them in myself.
+- After finishing the work for each prompt, make exactly one git commit:
+  `hw07 prompt <prompt_id>: <short summary>`
+- If a prompt would take me past my budget of 16, do not do the work. Reply exactly
+  PROMPT_LIMIT_REACHED, and still log that prompt.
+- Never modify `AGENTS.md`, anything in `assignments/`, or anything in `policy/`.
+
+Confirm by responding with: HW07_CONTEXT_ACK
+```
+:::
+
+---
+
+## Questions
+
+### Q1 — Draw a DAG *(Suggested prompts: 1)*
+
+Before fitting anything, think about the causal structure. **This question determines what the
+rest of the assignment means**, so do it first and do it honestly.
+
+Draw a DAG for weekly demand including at least: `units`, `avg_price`, `series` (which
+store-category this is), `time` (trend), `snap_days`, and `event_days`.
+
+No code needed — a Markdown table or ASCII diagram is fine. Justify every arrow in one sentence.
+
+```
+series  → avg_price   (categories differ systematically in price level)
+series  → units       (categories differ systematically in volume)
+time    → avg_price   (prices drift over five years)
+time    → units       (demand grows over the sample)
+avg_price → units     (the effect we want to estimate)
+...
+```
+
+**Then answer the question this exists to answer:** is there a confounder between `avg_price`
+and `units`? Name it, explain the mechanism in business terms, and state what you must do about
+it in the regression.
+
+> **Your response:**
+
+---
+
+### Q2 — OLS Benchmark, Two Ways *(Suggested prompts: 2)*
+
+Fit **two** OLS regressions with `statsmodels`, and note that the difference between them is the
+whole point of Q1.
+
+**(a) Naive** — regress `ly` on `lp`, `snap`, `event`.
+
+**(b) Controlled** — regress `ly` on `lpc`, `snap`, `event`, plus a trend (`t`) and series fixed
+effects (`pd.get_dummies(df.series)`).
+
+Report the coefficient table for each, and put the two price elasticities side by side.
+
+```{python}
+# (a) naive OLS
+# (b) OLS with trend and series fixed effects
+# Compare the two price coefficients
+```
+
+> **Your response:** Report both elasticities. They will differ substantially. Using your DAG
+> from Q1, explain **which one estimates the quantity you actually want**, and why the other is
+> biased in the direction it is.
+>
+> Then look at the standard errors: the naive estimate is not merely different, it is at least as
+> *precise*. Explain why precision is no defence here.
+
+---
+
+### Q3 — Bayesian Linear Regression *(Suggested prompts: 3)*
+
+Fit the **controlled** specification from Q2(b) as a Bayesian model — price, SNAP, events,
+trend, and a per-series intercept. Use weakly informative priors:
+
+- `beta_j ~ Normal(0, 1)` for each predictor (weakly informative on these scales)
+- `alpha ~ Normal(0, 1)` for the intercept
+- `sigma ~ HalfNormal(1)` for observation noise
+
+Give the per-series intercepts a hierarchical prior, written **non-centred**, as in Homework 6.
+
+Sample with `pm.sample(1000, tune=1500, chains=4, target_accept=0.9)` and report the posterior
+mean, sd and 94% HDI for each coefficient — plus $\hat{R}$, ESS and divergences.
+
+::: {.callout-warning}
+## Ask ArviZ for the HDI explicitly
+
+`az.summary(idata)` reports an **89% equal-tailed interval** by default, not the HDI. For the
+highest-density interval this course uses, call
+`az.summary(idata, ci_kind="hdi", ci_prob=0.94)`, or `az.hdi(samples, prob=0.94)` on raw draws.
+
+An equal-tailed interval cuts 5.5% off each tail; an HDI is the *shortest* interval holding 94%
+of the mass. They coincide for a symmetric posterior and diverge for a skewed one.
+:::
+
+```{python}
+# Build and sample Bayesian linear regression
+```
+
+> **Your response:** Compare the posterior means to the controlled OLS coefficients from Q2(b).
+> With this much data they should agree closely — say whether they do, and explain why agreement
+> is the *expected* result rather than a disappointing one.
+>
+> Then: what does a wide HDI tell you that a narrow one does not, and which coefficient here has
+> the widest relative to its mean?
+
+---
+
+### Q4 — Posterior Visualization *(Suggested prompts: 2)*
+
+Plot the posterior distributions for the three coefficients that matter most for a business
+decision — justify the choice from your DAG.
+
+For each, report:
+- Posterior mean
+- 94% HDI
+- `P(beta > 0)` — probability the effect is positive
+- Whether the HDI excludes zero (the Bayesian analog of significance)
+
+```{python}
+# Plot posterior distributions and compute P(beta > 0)
+```
+
+> **Your response:** For the **price** coefficient, report $P(\beta_{\text{price}} < 0)$ — the
+> probability that raising price reduces demand. Contrast that statement with what the OLS
+> p-value in Q2 actually claims, and say which one you could put in front of a manager without
+> having to correct it afterwards.
+
+---
+
+### Q5 — ROPE Analysis *(Suggested prompts: 2)*
+
+"Credible" and "big enough to act on" are different questions. A **ROPE** — region of practical
+equivalence — makes the second one explicit.
+
+For each predictor, compute the fraction of posterior mass inside `|beta| < 0.05`. Because
+nothing here is standardized, that threshold reads directly: for price, an elasticity between
+$-0.05$ and $0.05$ means a 1% price change moves units by less than 0.05% — no one would act on
+it. For `snap` and `event` it means a weekly lift under 5%.
+
+Present results in a table:
+
+| Predictor | Posterior Mean | 94% HDI | % in ROPE | Practically significant? |
+|-----------|---------------|---------|-----------|--------------------------|
+
+A predictor is "practically significant" if less than 5% of its posterior falls
+in the ROPE.
+
+```{python}
+# Compute % of posterior in ROPE for each predictor
+```
+
+> **Your response:** Name any predictor that is **credible but negligible** — HDI excluding zero
+> while most of its posterior sits inside the ROPE. That combination is common in large samples
+> and is exactly what a p-value cannot express.
+>
+> What should a manager do with such a finding, and what would have to change for it to become
+> worth acting on?
+
+---
+
+### Q6 — Conditional Scenario Simulation *(Suggested prompts: 3)*
+
+A category manager is considering a **5% price increase** across the board and wants to know what
+happens to volume — and how confident anyone can be about it.
+
+Push the scenario through your posterior rather than through a point estimate.
+
+```{python}
+# b = idata.posterior["b_price"].values.ravel()
+# pct_change = 100 * (np.exp(b * np.log(1.05)) - 1)
+# report the mean and the 94% interval of pct_change
+```
+
+**(a)** Report the mean percentage change in units and its 94% interval.
+
+**(b)** Revenue rises if the percentage volume loss is smaller than the 5% price gain. Compute
+the **probability that revenue increases**, directly from the posterior samples.
+
+**(c)** Repeat using the *naive* elasticity from Q2(a). Report how the recommendation changes.
+
+> **Your response:** Give the manager a two-sentence recommendation with a probability attached.
+> Then state the caveat honestly: this is a causal claim about intervening on price, and it is
+> only as good as the DAG in Q1. Name one arrow that, if wrong, would invalidate the answer.
+
+---
+
+### Q7 — Course Capstone Reflection *(Suggested prompts: 0 — write yourself)*
+
+No code required. In 200–250 words: Look back at the full arc of this course —
+from exponential smoothing in Homework 1 to Bayesian regression in this homework.
+
+Answer the following:
+
+1. **Which method from the course would you use first** when you encounter a new
+   business forecasting problem, and why? (Consider ease of implementation,
+   interpretability, and typical performance.)
+
+2. **Where does Bayesian inference add the most value** compared to the classical
+   and machine learning methods you used earlier? Give a specific example from
+   your homework results.
+
+3. **What is one limitation** of every method in this course — something none of
+   them handle well — and what would you do in practice to address it?
+
+> **Your response:**
+
+---
+
+## Submission Checklist
+
+- [ ] All code cells run without errors from top to bottom
+- [ ] Written responses completed in your own words
+- [ ] `INITIAL_PROMPT.md` saved in `submissions/hw07_<your_name>/`
+- [ ] `PROMPT_LOG.md` complete with **16 or fewer** entries
+- [ ] One git commit per Codex prompt (`hw07 prompt <id>: <short summary>`)
+- [ ] `REPORT.md` with a clear business recommendation

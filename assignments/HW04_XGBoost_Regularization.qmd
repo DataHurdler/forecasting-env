@@ -1,0 +1,432 @@
+---
+title: "Homework 4: Boosted Trees and Regularization"
+subtitle: "ECON 8310: Business Forecasting — University of Nebraska at Omaha · Fall 2026"
+author: "Your Name"
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    code-fold: false
+    self-contained: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+::: {.callout-note}
+## Your numbers will not match mine, and that is fine
+
+Every result in this course depends on a random seed, and often also on your library
+versions, your hardware, and how many CPU threads your machine uses. Two people running
+identical, correct code will get different numbers — sometimes noticeably different.
+
+**What is graded** is that you used the right model and the right procedure, and that your
+interpretation follows from the numbers *you* actually obtained. Quote your own output.
+
+**What is not graded** is matching any particular value. Do not tune your way toward a number
+you saw on a slide or heard from a classmate — that is the one way to turn this into a wrong
+answer.
+
+One caveat worth knowing. The broad *ordering* of models usually survives this variation. If
+yours comes out backwards from what the lecture found, say so in a sentence and offer a reason:
+either you have found something real about your run, or there is a bug worth hunting. Both are
+worth more marks than quietly reporting a number you do not believe.
+:::
+
+## Overview
+
+Boosting builds trees sequentially — each new tree corrects the errors left by the previous ones.
+XGBoost is the dominant gradient boosting implementation for tabular data, and it often
+outperforms Random Forests given proper tuning. Regularized linear models (LASSO, Ridge,
+Elastic Net) take a different approach: they shrink coefficients toward zero, performing
+automatic feature selection while keeping the model interpretable.
+
+This homework applies both families to the same M5/Walmart data as Homework 3 — but with a
+**deliberately richer feature set** — and ends with a head-to-head comparison across every
+method tried in the course so far.
+
+**Learning objectives:**
+
+- Fit XGBoost and interpret gain-based feature importance
+- Tune `learning_rate`, `max_depth`, and `reg_lambda` using time-series cross-validation
+- Read a LASSO regularization path to identify robust vs fragile features
+- Compare LASSO, Ridge, and Elastic Net on test RMSE and sparsity
+- Synthesize walk-forward CV results across all models
+
+---
+
+## Dataset and Setup
+
+We use the same weekly M5 data and the same temporal split as Homework 3 — but we engineer many
+more features first, and the reason matters.
+
+In Homework 3 you had 27 features and 5,160 training rows. With $k$ that much smaller than $n$,
+there is very little for a shrinkage penalty to do: ordinary least squares is already stable, and
+Ridge or LASSO will select almost no penalty. Regularization earns its keep when $k$ is *large
+relative to* $n$, which is exactly the situation Lecture 6 opened with.
+
+So we build the feature set a working analyst would actually build — ten lags, rolling means and
+standard deviations at four windows, Fourier terms for the annual cycle, calendar variables, and
+one-hot identity columns — and let the penalty decide which survive.
+
+```{python}
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import xgboost as xgb
+from sklearn.linear_model import Lasso, Ridge, ElasticNet, ElasticNetCV, RidgeCV
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+from sklearn.model_selection import TimeSeriesSplit, GridSearchCV
+from sklearn.metrics import mean_squared_error
+import warnings
+warnings.filterwarnings('ignore')
+
+from pathlib import Path
+
+def data_path(name):
+    for base in (Path.cwd(), *Path.cwd().parents):
+        p = base / "data" / "processed" / name
+        if p.exists():
+            return p
+    raise FileNotFoundError(
+        f"Could not find data/processed/{name}. "
+        "Run `python scripts/prep_m5.py` from the repository root first."
+    )
+
+RANDOM_STATE = 42
+
+weekly = (pd.read_csv(data_path("m5_weekly.csv"), parse_dates=["week_start"])
+            .sort_values(["store_id", "cat_id", "week_start"]))
+
+# --- feature engineering, per store-category series ---------------------------
+g = weekly.groupby(["store_id", "cat_id"])["units"]
+
+for L in (1, 2, 3, 4, 5, 6, 8, 13, 26, 52):        # ten lags
+    weekly[f"lag{L}"] = g.shift(L)
+
+for W in (4, 13, 26, 52):                           # rolling stats, shifted to avoid leakage
+    weekly[f"roll{W}_mean"] = g.shift(1).rolling(W).mean().values
+    weekly[f"roll{W}_std"]  = g.shift(1).rolling(W).std().values
+
+weekly["month"] = weekly["week_start"].dt.month
+weekly["week_of_year"] = weekly["week_start"].dt.isocalendar().week.astype(int)
+weekly["year"] = weekly["week_start"].dt.year
+
+for k in (1, 2, 3):                                 # Fourier terms for the annual cycle
+    weekly[f"sin{k}"] = np.sin(2 * np.pi * k * weekly.week_of_year / 52)
+    weekly[f"cos{k}"] = np.cos(2 * np.pi * k * weekly.week_of_year / 52)
+
+df_enc = pd.get_dummies(weekly, columns=["store_id", "cat_id", "state_id"],
+                        prefix=["store", "cat", "state"])
+
+FEATURES = ([c for c in df_enc.columns
+             if c.startswith(("lag", "roll", "sin", "cos", "store_", "cat_", "state_"))]
+            + ["avg_price", "snap_days", "event_days", "month", "week_of_year", "year"])
+TARGET = "units"
+
+LAGGED = [c for c in FEATURES if c.startswith(("lag", "roll"))]
+df = df_enc.dropna(subset=LAGGED).copy()
+
+cutoff = pd.Timestamp("2015-05-17")          # same split as Homework 3
+train = df[df["week_start"] < cutoff]
+test  = df[df["week_start"] >= cutoff]
+
+X_train, y_train = train[FEATURES].values.astype(float), train[TARGET].values
+X_test,  y_test  = test[FEATURES].values.astype(float),  test[TARGET].values
+
+print(f"k = {len(FEATURES)} features | train {len(X_train):,} rows | test {len(X_test):,} rows")
+```
+
+::: {.callout-note}
+## Note the `.shift(1)` on the rolling features
+
+`g.shift(1).rolling(W)` computes each rolling statistic from data strictly **before** the current
+week. Drop the `.shift(1)` and the window includes the current week's own units — the target
+leaking into its own predictor. Your CV error would improve and your forecast would fail. This is
+the same leakage failure as random k-fold, wearing different clothes.
+:::
+
+Compute the **seasonal-naive benchmark** (predict `units` with `lag52`) on the test set before
+going further. Every model below is measured against it.
+
+---
+
+## Initial Prompt for Codex
+
+::: {.callout-important}
+## Initial Prompt for Codex
+
+Paste the following as your first message to Codex. Save it as `INITIAL_PROMPT.md`
+in your submission folder.
+
+```
+I am working on Homework 4 for ECON 8310: Business Forecasting at the
+University of Nebraska at Omaha.
+
+Dataset: M5/Walmart — weekly aggregated, 30 store-category series, at
+`data/processed/m5_weekly.csv`. Same temporal split as Homework 3
+(train < 2015-05-17, test >= 2015-05-17), but with an engineered feature
+set of ~46 columns: ten lags (lag1..lag52), rolling mean and std at
+windows 4/13/26/52, Fourier terms sin1..sin3 and cos1..cos3, calendar
+features (month, week_of_year, year), avg_price, snap_days, event_days,
+and one-hot store/cat/state identifiers.
+
+This homework covers XGBoost and regularized linear regression (LASSO,
+Ridge, Elastic Net) for sales forecasting using Python. I will ask you
+questions one at a time. For each:
+1. Write clean, well-commented Python code that runs end-to-end
+2. Explain what the output means so that I understand it — but do NOT draft the written
+   answers I submit. The interpretation and business-recommendation sections are mine to
+   write, in my own words.
+
+My prompt budget is 12 (this context prompt is excluded). I will label
+each question before asking.
+
+
+Repository rules — these apply to every prompt in this thread:
+- My submission folder is `submissions/hw04_<my_name>/`. Put everything there.
+- Keep a `PROMPT_LOG.md` in that folder. For every prompt I send, append a block:
+      ### Prompt <n> — YYYY-MM-DD HH:MM
+      <my prompt, verbatim>
+  Numbered from 1, in order. Never edit or delete an earlier entry. If your tool cannot write
+  files, I will paste them in myself.
+- After finishing the work for each prompt, make exactly one git commit:
+  `hw04 prompt <prompt_id>: <short summary>`
+- If a prompt would take me past my budget of 12, do not do the work. Reply exactly
+  PROMPT_LIMIT_REACHED, and still log that prompt.
+- Never modify `AGENTS.md`, anything in `assignments/`, or anything in `policy/`.
+
+Confirm by responding with: HW04_CONTEXT_ACK
+```
+:::
+
+---
+
+## Questions
+
+### Q1 — XGBoost Baseline *(Suggested prompts: 2)*
+
+Fit an `xgb.XGBRegressor` with the following hyperparameters:
+
+- `n_estimators=200`
+- `learning_rate=0.1`
+- `max_depth=5`
+- `subsample=0.8`
+- `colsample_bytree=0.8`
+- `random_state=42`
+
+Report the test RMSE. Compare it to the Random Forest RMSE you recorded in Homework 3 (enter
+that value in a comment) and to the seasonal-naive benchmark. Then plot the top-15 XGBoost
+feature importances using `importance_type="gain"` as a horizontal bar chart sorted descending.
+
+```{python}
+# Fit XGBoost baseline and plot feature importances
+```
+
+> **Your response:** Does XGBoost outperform Random Forest on test RMSE? Based on the gain-based
+> importance plot, which features matter most — and did any of the engineered rolling or Fourier
+> features earn a place near the top?
+
+---
+
+### Q2 — Hyperparameter Tuning *(Suggested prompts: 2)*
+
+**(a)** Conduct a grid search over:
+
+- `learning_rate`: [0.01, 0.05, 0.1]
+- `max_depth`: [3, 5, 7]
+
+Hold `n_estimators=300` fixed. Use `TimeSeriesSplit(n_splits=3)` as the CV strategy
+and negative RMSE as the scoring metric. Report the best combination, its CV RMSE,
+and its test RMSE.
+
+**(b)** Now a second, smaller search over **`reg_lambda`** in `[0.1, 1.0, 10.0, 100.0]`, holding
+the rest at the best values from (a). Report the best `reg_lambda` and the resulting test RMSE.
+
+```{python}
+from sklearn.model_selection import TimeSeriesSplit, GridSearchCV
+
+param_grid = {
+    "learning_rate": [0.01, 0.05, 0.1],
+    "max_depth": [3, 5, 7],
+}
+# (a) Complete the grid search here
+
+# (b) Then sweep reg_lambda holding the winners from (a) fixed
+```
+
+::: {.callout-note}
+## `reg_lambda` is not a new idea
+
+Lecture 6 showed that XGBoost's `reg_lambda` is **literally an $\ell_2$ penalty on the leaf
+weights** — the same Ridge penalty you are about to apply to regression coefficients in Q4,
+applied to a different set of numbers. Keep your `reg_lambda` result in view when you get there:
+you are running the same idea twice, on two different model families, in one assignment.
+:::
+
+> **Your response:** Why must you use `TimeSeriesSplit` rather than standard k-fold CV for this
+> problem? What would go wrong if you used standard k-fold? And separately: how much did tuning
+> actually buy you over the Q1 defaults — is the gain worth the compute?
+
+---
+
+### Q3 — LASSO Regularization Path *(Suggested prompts: 2)*
+
+Standardize the features using `StandardScaler` (LASSO is sensitive to feature scale).
+Fit LASSO at 30 values of `alpha` spaced logarithmically from 1 to 10,000.
+Plot the regularization path: coefficient values on the y-axis, log₁₀(alpha) on the
+x-axis, one line per feature labeled by name.
+
+Identify: which features shrink to zero first (at the smallest alpha)? Which are the
+last to shrink (most robust to regularization)?
+
+```{python}
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled  = scaler.transform(X_test)
+
+alphas = np.logspace(0, 4, 30)
+# Fit LASSO at each alpha and collect coefficients
+# Also record the number of non-zero coefficients at each alpha
+```
+
+Alongside the coefficient path, plot **non-zero count against log₁₀(alpha)**. That second plot is
+often the more useful one in practice: it tells you how much model you are buying at each level
+of penalty.
+
+> **Your response:** Which features are the last three standing as alpha increases? Report the
+> *ordering* in which features drop out, not just the final survivors — Lecture 6 argued that this
+> ordering is a more stable finding than any single coefficient table, and this is where you check
+> whether that holds. Does the ordering match what XGBoost's gain importance told you in Q1?
+
+---
+
+### Q4 — Elastic Net vs LASSO vs Ridge *(Suggested prompts: 2)*
+
+Lecture 6 gave two knobs: $\lambda$ sets the **total** penalty, $\alpha$ (sklearn's `l1_ratio`)
+sets the **mix**. This question separates them properly.
+
+::: {.callout-warning}
+## Do not fix alpha across all five models
+
+It is tempting to fit `Lasso(alpha=100)`, `ElasticNet(alpha=100, ...)`, and `Ridge(alpha=100)`
+and call that a fair comparison. **It is not**, for two separate reasons.
+
+First, `sklearn` scales the two objectives differently. `Lasso` and `ElasticNet` minimize
+$\frac{1}{2n}\|y - Xw\|^2 + \ldots$, while `Ridge` minimizes $\|y - Xw\|^2 + \alpha\|w\|^2$
+with **no** $1/2n$ factor. With $n \approx 5{,}000$ training rows, the same numeric `alpha` means
+penalties that differ by roughly four orders of magnitude.
+
+Second, even within one family, the right total penalty depends on the mix — an $\ell_2$-heavy
+model needs a different $\lambda$ than an $\ell_1$-heavy one to be equally regularized.
+
+So **tune $\lambda$ separately for every mix**, exactly as Lecture 6's code slide does.
+:::
+
+For each `l1_ratio` in `[1.0, 0.9, 0.5, 0.1]`, use `ElasticNetCV` with
+`alphas=np.logspace(-2, 4, 50)` and `cv=TimeSeriesSplit(n_splits=5)` to select the best alpha.
+Then fit a `RidgeCV` with `alphas=np.logspace(-2, 7, 80)` and the same CV.
+
+Wrap each in `make_pipeline(StandardScaler(), ...)` so scaling is refit **inside each fold**.
+
+Report, in one table: the model, its selected alpha, its test RMSE, and its number of non-zero
+coefficients out of the total.
+
+```{python}
+tscv = TimeSeriesSplit(n_splits=5)
+
+# For each l1_ratio, fit ElasticNetCV inside a pipeline with StandardScaler
+# Then fit RidgeCV the same way
+# Collect: selected alpha, test RMSE, non-zero coefficient count
+```
+
+> **Your response:** Which mix gives the best test RMSE, and how much separates best from worst —
+> is the difference large enough to matter operationally? Which mix gives the *sparsest* model
+> that is still competitive, and why might you ship that one instead of the outright winner?
+>
+> Then explain, in one sentence each, why the scaling warning above matters and why
+> `make_pipeline` is doing real work here rather than being tidy.
+
+---
+
+### Q5 — Walk-Forward CV Comparison *(Suggested prompts: 2)*
+
+Re-use the expanding-window walk-forward CV framework from Homework 3
+(13-week steps, same cutoffs). Compare four models:
+
+- Best XGBoost (tuned hyperparameters from Q2, including `reg_lambda`)
+- `RandomForestRegressor(n_estimators=200, random_state=42)`
+- The best Elastic Net configuration from Q4, at its selected alpha
+- Ridge at its `RidgeCV`-selected alpha
+
+Report mean CV RMSE for each in a summary table, with the seasonal-naive benchmark as a
+reference row.
+
+```{python}
+cutoffs = pd.date_range("2014-01-05", "2015-05-17", freq="13W")   # 6 rounds, as in HW3
+print(f"{len(cutoffs)} CV rounds:", [str(c.date()) for c in cutoffs])
+
+# Walk-forward CV loop
+# Re-fit each model at each cutoff; keep the hyperparameters fixed at their tuned values
+```
+
+::: {.callout-note}
+## One honest caveat about this comparison
+
+You tuned the XGBoost and Elastic Net hyperparameters on data that overlaps these CV windows. So
+these CV numbers are mildly optimistic for the tuned models and not for the untuned ones. Note it
+in your answer — you are not expected to fix it, only to notice it. Doing it strictly would mean
+re-tuning inside every fold, which is the nested cross-validation you would use if this were
+going into production.
+:::
+
+> **Your response:** Does walk-forward CV change the ranking compared to the single test-set
+> evaluation? What does that tell you about the stability of each model over time? Name the model
+> whose rank moved most, and offer an explanation for why.
+
+---
+
+### Q6 — Recommendation Memo *(Suggested prompts: 0 — write yourself)*
+
+No code required. In 150–200 words, write a recommendation memo addressed to Walmart regional
+analytics leadership. You must choose **one** model to deploy in production for weekly
+store-category demand forecasting. Your options:
+
+- Best ETS or ARIMA (Homework 1)
+- Best GAM / Prophet (Homework 2)
+- Random Forest (Homework 3)
+- XGBoost (this homework)
+- Regularized linear model — LASSO, Elastic Net, or Ridge (this homework)
+
+Cover: (1) your choice and the evidence supporting it — CV RMSE, interpretability, and cost to
+maintain; (2) one risk you would monitor after deployment; and (3) whether you would keep any
+other model as a benchmark or fallback.
+
+::: {.callout-important}
+## Do not assume the most complex model won
+
+Compare your Q4 and Q5 numbers before you write. If a regularized linear model matched or beat
+the boosted trees here, say so plainly and follow the implication through — a model that is
+smaller, faster to refit, and whose coefficients you can read aloud carries real operational
+advantages that an RMSE table does not show. If boosting genuinely won, say by how much, and
+whether that margin justifies the extra machinery.
+:::
+
+> **Your response:**
+
+---
+
+## Submission Checklist
+
+Before submitting, confirm:
+
+- [ ] All code cells run without errors from top to bottom
+- [ ] Written responses completed in your own words (not AI-generated prose)
+- [ ] `INITIAL_PROMPT.md` saved in `submissions/hw04_<your_name>/`
+- [ ] `PROMPT_LOG.md` complete with ≤ 12 entries
+- [ ] One git commit per Codex prompt (`hw04 prompt <id>: <short summary>`)
+- [ ] `REPORT.md` with a clear business recommendation

@@ -1,7 +1,6 @@
-# Files/directories that students should not modify.
-# Enforced by instructor-side validation against the canonical reference repo.
+# Files and directories students must not modify.
+# Checked by scripts/validate_submission.py against the canonical instructor copy.
 
 AGENTS.md
 assignments/
 policy/
-prompts/REQUIRED_INITIAL_PROMPT.md

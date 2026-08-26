@@ -1,0 +1,256 @@
+---
+title: "Homework 5: Deep Learning for Time Series"
+subtitle: "ECON 8310: Business Forecasting — University of Nebraska at Omaha · Fall 2026"
+author: "Your Name"
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    code-fold: false
+    self-contained: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+> **Due **Week 11**. Covers the recurrent and attention architectures. Reuses the `SeriesWindowDataset` you wrote in Part 1, rebuilt at a 52-week window.**
+
+---
+
+::: {.callout-note}
+## Your numbers will not match mine, and that is fine
+
+Every result in this course depends on a random seed, and often also on your library
+versions, your hardware, and how many CPU threads your machine uses. Two people running
+identical, correct code will get different numbers — sometimes noticeably different.
+
+**What is graded** is that you used the right model and the right procedure, and that your
+interpretation follows from the numbers *you* actually obtained. Quote your own output.
+
+**What is not graded** is matching any particular value. Do not tune your way toward a number
+you saw on a slide or heard from a classmate — that is the one way to turn this into a wrong
+answer.
+
+One caveat worth knowing. The broad *ordering* of models usually survives this variation. If
+yours comes out backwards from what the lecture found, say so in a sentence and offer a reason:
+either you have found something real about your run, or there is a bug worth hunting. Both are
+worth more marks than quietly reporting a number you do not believe.
+:::
+
+## Overview
+
+This part continues Homework 5. See Part 1 for the full framing.
+
+---
+
+## Dataset and Setup
+
+We construct fixed-length sliding windows over each store-category series. Each input is a window
+of past weeks; the target is the next week's units. **Part A** (FFN, CNN) uses a 26-week window;
+**Part B** (RNN, LSTM, Transformer) uses 52 weeks, so the sequence models get a full annual cycle.
+
+```{python}
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import math
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
+from sklearn.metrics import mean_squared_error
+import warnings
+warnings.filterwarnings('ignore')
+
+from pathlib import Path
+
+def data_path(name):
+    for base in (Path.cwd(), *Path.cwd().parents):
+        p = base / "data" / "processed" / name
+        if p.exists():
+            return p
+    raise FileNotFoundError(
+        f"Could not find data/processed/{name}. "
+        "Run `python scripts/prep_m5.py` from the repository root first."
+    )
+
+RANDOM_STATE = 42
+torch.manual_seed(RANDOM_STATE)
+np.random.seed(RANDOM_STATE)
+
+weekly = (pd.read_csv(data_path("m5_weekly.csv"), parse_dates=["week_start"])
+            .sort_values(["store_id", "cat_id", "week_start"]))
+weekly["series"] = weekly.store_id + "_" + weekly.cat_id
+
+# The four channels every window carries through time
+CHANNELS = ["units", "snap_days", "event_days", "avg_price"]
+
+CUTOFF = pd.Timestamp("2015-05-17")     # same split as Homework 3 and 4
+
+print(f"{weekly.series.nunique()} series | "
+      f"{weekly.week_start.min().date()} to {weekly.week_start.max().date()} | "
+      f"{len(weekly):,} rows")
+```
+
+**Building the windows.** For each series, slide a window of length `W` along the history: the
+window is the input, the units in week `W+1` is the target. A window belongs to the training set
+if its *target* week falls before the cutoff.
+
+::: {.callout-warning}
+## Two mistakes that will not raise an error
+
+**Do not shuffle.** `DataLoader(..., shuffle=False)` for every model here. Shuffling destroys the
+ordering the sequence models exist to exploit, and it will not warn you.
+
+**Standardize using training statistics only.** Compute the mean and standard deviation on the
+training windows, then apply them to the test windows. Computing them over the full dataset leaks
+the test period into training — the same error as scaling outside a CV fold in Homework 4.
+:::
+
+---
+
+## Initial Prompt for Codex
+
+::: {.callout-important}
+## Initial Prompt for Codex
+
+Paste the following as your first message to Codex. Save it as `INITIAL_PROMPT.md`
+in your submission folder.
+
+```
+I am working on Homework 5 Part 2 for ECON 8310: Business Forecasting at the
+University of Nebraska at Omaha.
+
+Dataset: M5/Walmart — weekly aggregated, 30 store-category series, at
+`data/processed/m5_weekly.csv`. Columns: store_id, cat_id, state_id,
+week_start, units (target), avg_price, snap_days, event_days, and lagged
+units. I build sliding windows over each series: 26 weeks for Part A and
+52 weeks for Part B, with four channels (units, snap_days, event_days,
+avg_price). Temporal split at 2015-05-17, matching Homework 3 and 4.
+
+This homework covers four neural network architectures for time series
+forecasting: FFN, 1D CNN, LSTM, and Transformer encoder (all in PyTorch).
+I will ask you questions one at a time. For each:
+1. Write clean, well-commented PyTorch code that runs end-to-end
+2. Explain what the output means so that I understand it — but do NOT draft the written
+   answers I submit. The interpretation and business-recommendation sections are mine to
+   write, in my own words.
+
+My prompt budget for Part 2 is 10 (this context prompt is excluded). I will label
+each question before asking.
+
+
+Repository rules — these apply to every prompt in this thread:
+- My submission folder is `submissions/hw05_part2_<my_name>/`. Put everything there.
+- Keep a `PROMPT_LOG.md` in that folder. For every prompt I send, append a block:
+      ### Prompt <n> — YYYY-MM-DD HH:MM
+      <my prompt, verbatim>
+  Numbered from 1, in order. Never edit or delete an earlier entry. If your tool cannot write
+  files, I will paste them in myself.
+- After finishing the work for each prompt, make exactly one git commit:
+  `hw05_part2 prompt <prompt_id>: <short summary>`
+- If a prompt would take me past my budget of 10, do not do the work. Reply exactly
+  PROMPT_LIMIT_REACHED, and still log that prompt.
+- Never modify `AGENTS.md`, anything in `assignments/`, or anything in `policy/`.
+
+Confirm by responding with: HW05P2_CONTEXT_ACK
+```
+:::
+
+---
+
+## Part B: Sequence Models (window = 52 weeks)
+
+Rebuild the datasets with `WINDOW_B = 52` so the sequence models get a full annual cycle.
+
+```{python}
+WINDOW_B = 52
+# Re-instantiate SeriesWindowDataset and DataLoaders with WINDOW_B
+```
+
+---
+
+### Q1 — Vanilla RNN *(Suggested prompts: 3)*
+
+The simplest recurrent model, and the one Lecture 9 found hardest to beat.
+
+- `nn.RNN(input_size=4, hidden_size=64, batch_first=True)`
+- Take the **final** hidden state and pass it through `Linear(64 → 1)`
+
+Train 40 epochs, Adam `lr=1e-3`, `weight_decay=1e-4`. Add
+`torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)` after `loss.backward()` — recurrent
+models are prone to exploding gradients.
+
+```{python}
+class RNNForecaster(nn.Module):
+    def __init__(self, n_channels, hidden=64):
+        super().__init__()
+        # TODO
+
+    def forward(self, x):
+        # TODO: out, h = self.rnn(x); use out[:, -1, :]
+        pass
+```
+
+> **Your response:** Report the parameter count (`sum(p.numel() for p in model.parameters())`) and
+> the test RMSE. Compare both against the CNN from **Part 1, Q3** — note that this window is
+> longer, so say what that does and does not make comparable.
+
+---
+
+### Q2 — LSTM *(Suggested prompts: 3)*
+
+Same structure, swapping `nn.RNN` for `nn.LSTM(input_size=4, hidden_size=64, batch_first=True)`.
+Note that `nn.LSTM` returns `out, (h, c)` rather than `out, h`.
+
+Train identically to Q1 so the comparison is clean.
+
+```{python}
+class LSTMForecaster(nn.Module):
+    # TODO
+    pass
+```
+
+> **Your response:** Report parameters and test RMSE. The LSTM has roughly **four times** the
+> parameters of the RNN at the same hidden size — explain where they go. Then: did the extra
+> capacity buy you accuracy? If not, what does that say about whether this problem has the kind
+> of long-range dependency gating is designed to preserve?
+
+---
+
+### Q3 — Transformer Encoder *(Suggested prompts: 4)*
+
+- Project the 4 channels to `d_model=64` with a `Linear`
+- **Add sinusoidal positional encoding** — you must write this yourself, PyTorch does not add it
+- `nn.TransformerEncoderLayer(d_model=64, nhead=4, dim_feedforward=128, dropout=0.1,
+  batch_first=True)`, wrapped in `nn.TransformerEncoder(..., num_layers=2)`
+- Take the final position and pass through `Linear(64 → 1)`
+
+**(b)** Then train a second copy **without** the positional encoding and report both RMSEs.
+
+```{python}
+def sinusoidal(seq_len, d_model):
+    # TODO: returns (1, seq_len, d_model)
+    pass
+
+class TransformerForecaster(nn.Module):
+    # TODO
+    pass
+```
+
+> **Your response:** Report both RMSEs. Attention computes a weighted average over positions, and
+> averaging does not care about order — use that to explain why removing the positional encoding
+> does what it does. Why is this failure mode particularly dangerous compared with a bug that
+> raises an exception?
+
+---
+
+## Submission Checklist
+
+- [ ] All code cells run without errors from top to bottom
+- [ ] Written responses completed in your own words
+- [ ] `INITIAL_PROMPT.md` saved in `submissions/hw05_part2_<your_name>/`
+- [ ] `PROMPT_LOG.md` complete with **10 or fewer** entries for Part 2
+- [ ] One git commit per Codex prompt (`hw05_part2 prompt <id>: <short summary>`)

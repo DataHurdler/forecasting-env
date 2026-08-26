@@ -1,24 +1,47 @@
 {
-  "_comment": "Prompt budgets for ECON 8310 (Fall 2026). Keys match the submission folder stem, the commit-message prefix, and the --homework argument to scripts/validate_submission.py. Multi-part assignments carry one entry per part, because each part is submitted separately and has its own budget.",
+  "_comment": "Prompt budgets for ECON 8310 (Fall 2026). Keys match the submission folder stem and the --homework argument to scripts/validate_submission.py. Budgets are TARGETS, not hard limits: going over is permitted and is reported as a note, not an error. See AI_POLICY.md.",
   "default_max_prompts": 20,
   "count_initial_prompt_toward_limit": false,
-  "require_commit_per_prompt": true,
+  "require_commit_per_prompt": false,
   "required_submission_files": [
     "INITIAL_PROMPT.md",
-    "PROMPT_LOG.jsonl"
+    "PROMPT_LOG.md"
   ],
-  "_required_files_note": "REPORT.md is required by every assignment except hw05_part1 and hw05_part2, but the validator applies required_submission_files globally, so it is not listed here. Check REPORT.md when grading those nine.",
   "homeworks": {
-    "hw01_part1": { "max_prompts": 4 },
-    "hw01_part2": { "max_prompts": 8 },
-    "hw02":       { "max_prompts": 10 },
-    "hw03":       { "max_prompts": 12 },
-    "hw04":       { "max_prompts": 12 },
-    "hw05_part1": { "max_prompts": 9 },
-    "hw05_part2": { "max_prompts": 10 },
-    "hw05_part3": { "max_prompts": 3 },
-    "hw06_part1": { "max_prompts": 10 },
-    "hw06_part2": { "max_prompts": 9 },
-    "hw07":       { "max_prompts": 16 }
-  }
+    "hw01_part1": {
+      "max_prompts": 4
+    },
+    "hw01_part2": {
+      "max_prompts": 8
+    },
+    "hw02": {
+      "max_prompts": 10
+    },
+    "hw03": {
+      "max_prompts": 12
+    },
+    "hw04": {
+      "max_prompts": 12
+    },
+    "hw05_part1": {
+      "max_prompts": 9
+    },
+    "hw05_part2": {
+      "max_prompts": 10
+    },
+    "hw05_part3": {
+      "max_prompts": 3
+    },
+    "hw06_part1": {
+      "max_prompts": 10
+    },
+    "hw06_part2": {
+      "max_prompts": 9
+    },
+    "hw07": {
+      "max_prompts": 16
+    }
+  },
+  "budgets_are_soft": true,
+  "_files_note": "REPORT.md is required by every assignment except hw05_part1 and hw05_part2. The validator applies required_submission_files globally, so it is not listed; check it when grading those nine."
 }

@@ -1,0 +1,235 @@
+---
+title: "Homework 1, Part 2: ARIMA, VAR & Method Comparison"
+subtitle: "ECON 8310: Business Forecasting — University of Nebraska at Omaha · Fall 2026"
+author: "Your Name"
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    code-fold: false
+    self-contained: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+# Overview
+
+This is **Part 2** of Homework 1, due before class in Week 3. It assumes you have submitted Part 1 (exponential smoothing) and that you have your Part 1 accuracy table available — Q5 asks you to compare against it.
+
+Part 2 covers ARIMA-based models and their multivariate extension, Vector Autoregression. Where exponential smoothing summarizes the past through a smoothed level, ARIMA models the correlation structure of the series directly, and VAR lets two series inform each other.
+
+**Learning objectives.** By the end of Part 2 you will be able to:
+
+- Diagnose stationarity with the Augmented Dickey-Fuller test and difference a series appropriately
+- Identify a plausible ARIMA($p,d,q$) order from ACF and PACF plots
+- Evaluate a model with walk-forward cross-validation rather than a single train/test split
+- Fit a VAR, run a Granger causality test, and state precisely what the result does and does not license you to claim
+
+---
+
+# Dataset and Split
+
+Same M5 weekly panel as Part 1, and **the same train/test split**, so your Part 2 numbers are directly comparable to Part 1.
+
+```{python}
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from statsmodels.tsa.arima.model import ARIMA
+from statsmodels.tsa.api import VAR
+from statsmodels.tsa.stattools import adfuller, grangercausalitytests
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+import warnings
+warnings.filterwarnings('ignore')
+
+from pathlib import Path
+
+def data_path(name):
+    """Find the processed data file whether you render from the repo root or from
+    this file's own folder."""
+    for base in (Path.cwd(), *Path.cwd().parents):
+        p = base / "data" / "processed" / name
+        if p.exists():
+            return p
+    raise FileNotFoundError(
+        f"Could not find data/processed/{name}. "
+        "Run `python scripts/prep_m5.py` from the repository root first."
+    )
+
+weekly = pd.read_csv(data_path("m5_weekly.csv"), parse_dates=["week_start"])
+
+ca1 = (weekly[(weekly.store_id == "CA_1") & (weekly.cat_id == "FOODS")]
+       .set_index("week_start")["units"].sort_index())
+
+N_TEST = 52                                   # identical to Part 1
+train, test = ca1.iloc[:-N_TEST], ca1.iloc[-N_TEST:]
+print(f"train: {len(train)} weeks   test: {len(test)} weeks")
+```
+
+---
+
+# Initial Prompt for Codex
+
+::: {.callout-important}
+::: {.callout-note}
+## Your numbers will not match mine, and that is fine
+
+Every result in this course depends on a random seed, and often also on your library
+versions, your hardware, and how many CPU threads your machine uses. Two people running
+identical, correct code will get different numbers — sometimes noticeably different.
+
+**What is graded** is that you used the right model and the right procedure, and that your
+interpretation follows from the numbers *you* actually obtained. Quote your own output.
+
+**What is not graded** is matching any particular value. Do not tune your way toward a number
+you saw on a slide or heard from a classmate — that is the one way to turn this into a wrong
+answer.
+
+One caveat worth knowing. The broad *ordering* of models usually survives this variation. If
+yours comes out backwards from what the lecture found, say so in a sentence and offer a reason:
+either you have found something real about your run, or there is a bug worth hunting. Both are
+worth more marks than quietly reporting a number you do not believe.
+:::
+
+## Initial Prompt for Codex
+
+Start a **new** Codex session for Part 2 and paste the block below as the very first message. It does **not** count against your Part 2 budget.
+
+```
+I am working on Homework 1, Part 2 for ECON 8310: Business Forecasting at the University of Nebraska at Omaha.
+
+Dataset: M5 / Walmart weekly sales, prepared at `data/processed/m5_weekly.csv`. Columns: store_id (10 Walmart stores across CA, TX, WI), cat_id (FOODS, HOBBIES, HOUSEHOLD), state_id, week_start, units, avg_price, snap_days, event_days, and lag features. There are 30 store-category series, each with 277 weekly observations covering January 2011 to May 2016.
+
+Part 2 covers ARIMA, walk-forward cross-validation, VAR, and Granger causality using Python and statsmodels, on the CA_1 and CA_3 FOODS series. I already completed exponential smoothing in Part 1 and will compare against those results. The train/test split is fixed: the final 52 weeks are the test set. For each question:
+1. Write clean, well-commented Python code that runs end-to-end
+2. Explain what the output means so that I understand it — but do NOT draft the written
+   answers I submit. The interpretation and business-recommendation sections are mine to
+   write, in my own words.
+
+My prompt budget for Part 2 is 8 (this context prompt is excluded). I will label each question before asking.
+
+
+Repository rules — these apply to every prompt in this thread:
+- My submission folder is `submissions/hw01_part2_<my_name>/`. Put everything there.
+- Keep a `PROMPT_LOG.md` in that folder. For every prompt I send, append a block:
+      ### Prompt <n> — YYYY-MM-DD HH:MM
+      <my prompt, verbatim>
+  Numbered from 1, in order. Never edit or delete an earlier entry. If your tool cannot write
+  files, I will paste them in myself.
+- After finishing the work for each prompt, make exactly one git commit:
+  `hw01_part2 prompt <prompt_id>: <short summary>`
+- If a prompt would take me past my budget of 8, do not do the work. Reply exactly
+  PROMPT_LIMIT_REACHED, and still log that prompt.
+- Never modify `AGENTS.md`, anything in `assignments/`, or anything in `policy/`.
+
+Confirm by responding with: HW01P2_CONTEXT_ACK
+```
+
+Submit this text as **`INITIAL_PROMPT.md`** in your Part 2 submission folder.
+:::
+
+---
+
+# Questions
+
+## Q3 — ARIMA
+
+*(Suggested prompts: 3)*
+
+Work through the following steps for the CA_1 FOODS series.
+
+**(a)** Run the Augmented Dickey-Fuller test. Report the test statistic, p-value, and your conclusion about stationarity. If differencing is needed, apply it and re-test.
+
+::: {.callout-warning}
+## This one is not clean, and that is the point
+
+The ADF result on this series **depends on how many augmenting lags you use**. `adfuller` picks a lag order automatically by default, but you can set `maxlag` yourself — and short lag orders and long ones do not agree here.
+
+Do not just report whatever the default returns. Run it at two or three different lag settings, report what you find, and *commit to a conclusion with a reason*. Then carry that conclusion into (b), (c), and Q4.
+
+Real series are frequently borderline. Learning to defend a judgment call is the skill; a clean p-value would have taught you nothing.
+:::
+
+**(b)** Plot the ACF and PACF of the (possibly differenced) series. Based on the plots, propose an ARIMA($p, d, q$) order and explain your reasoning. Compare what you see against the four reference patterns from Lecture 2 — which one does this series most resemble?
+
+**(c)** Fit your chosen ARIMA model on `train`. Report the AIC and compute the forecast RMSE on `test`.
+
+**(d)** Implement walk-forward cross-validation: use an expanding window with a minimum training length of 104 weeks, re-fit your ARIMA at each step, and produce a 1-step-ahead forecast. Report the mean RMSE across all steps.
+
+```{python}
+# (a) ADF test
+
+# (b) ACF and PACF plots
+
+# (c) Fit ARIMA on train, report AIC, compute RMSE on test
+
+# (d) Walk-forward CV, expanding window, min 104 weeks, 1-step-ahead
+```
+
+> **Your response:** Compare the ARIMA walk-forward RMSE to the best exponential smoothing model from Part 1. Which method would you recommend for a weekly store-category forecast and why — consider accuracy, interpretability, and what it costs to maintain across 30 series. Then note whether the walk-forward RMSE in (d) differs much from the single-split RMSE in (c), and say which number you would trust and why.
+
+---
+
+## Q4 — VAR and Granger Causality
+
+*(Suggested prompts: 3)*
+
+This question extends the analysis to two stores in the same state: **CA_1** and **CA_3**, both FOODS.
+
+**(a)** Test whether CA_3 FOODS Granger-causes CA_1 FOODS at lag 4 using `grangercausalitytests`. Report the F-statistic and p-value for that lag.
+
+Use **the transformation you justified in Q3(a)** — levels if you concluded the series is stationary, differences if you concluded it has a unit root. State which you used and why. Lecture 2 covered both hazards: regressing non-stationary series gives you spurious results, and differencing an already-stationary series induces autocorrelation you then have to model away.
+
+**(b)** Fit a VAR(4) on the training window of both series — same transformation as in (a) — using `statsmodels.tsa.api.VAR`. Forecast the next 4 weeks. Plot actual versus forecast for CA_1 only.
+
+**(c)** Report the contemporaneous correlation between the two series' weekly changes.
+
+```{python}
+ca3 = (weekly[(weekly.store_id == "CA_3") & (weekly.cat_id == "FOODS")]
+       .set_index("week_start")["units"].sort_index())
+
+# (a) Granger causality at lag 4, using the transformation you justified in Q3(a)
+
+# (b) VAR(4) on the training window, forecast 4 weeks, plot CA_1
+
+# (c) contemporaneous correlation of the weekly changes
+```
+
+> **Your response:** Answer in three parts.
+>
+> **First**, state what Granger causality means in your own words, and what it does *not* mean.
+>
+> **Second**, report what you actually found — the F-statistic, the p-value, and the contemporaneous correlation from (c). You will likely find both a strong contemporaneous correlation *and* a significant Granger test.
+>
+> **Third**, and this is the important one: explain what that combination does and does not establish. Two Walmart stores 40 miles apart share regional promotions, weather, holidays, and local economic conditions. Does CA_3's sales *cause* CA_1's? If not, what is generating both the correlation and the predictive relationship — and what would a demand planner be entitled to do with this result? Be specific about the difference between "CA_3 helps me forecast CA_1" and "CA_3 drives CA_1."
+
+---
+
+## Q5 — Method Comparison
+
+*(Suggested prompts: 0 — write yourself)*
+
+No code required for this question. Write your answer directly below in 150–200 words.
+
+You are a demand planner at Walmart responsible for producing 52-week store-category sales forecasts, updated monthly, across all 30 series in this dataset. Drawing on your results from Part 1 and from Q3–Q4, answer the following:
+
+Which of the methods from this homework (SES, Holt, Holt-Winters, ARIMA, VAR) would you recommend for **production use** at scale, and which would you retain as a **benchmark**? Justify your choice based on forecast accuracy, the operational realities of refitting 30 series every month, the cost of model maintenance, and interpretability to non-technical stakeholders.
+
+> **Your response:** *(150–200 words)*
+
+---
+
+# Submission Checklist
+
+Before submitting Part 2, confirm each item below.
+
+- [ ] All code cells run without errors from top to bottom (Kernel → Restart & Run All)
+- [ ] Written responses are completed in your own words — AI-generated prose is not accepted for written sections
+- [ ] `INITIAL_PROMPT.md` is saved in your Part 2 submission folder
+- [ ] `PROMPT_LOG.md` is complete with **8 or fewer** entries (one entry per Codex prompt sent)
+- [ ] One git commit per Codex prompt used, following the format: `hw01_part2 prompt <id>: <one-line summary>`
+- [ ] `REPORT.md` included with a final business recommendation (3–5 sentences) addressed to a non-technical manager, drawing on **both** parts of Homework 1

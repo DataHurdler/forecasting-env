@@ -1,0 +1,328 @@
+---
+title: "Homework 2: Generalized Additive Models"
+subtitle: "ECON 8310: Business Forecasting — University of Nebraska at Omaha · Fall 2026"
+author: "Your Name"
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    code-fold: false
+    self-contained: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+# Overview
+
+Generalized Additive Models (GAMs) extend linear regression by replacing straight-line effects with flexible smooth functions — one per predictor — that are then added together to produce a forecast. This structure preserves interpretability (you can inspect each component individually) while capturing nonlinear patterns that fixed-slope models miss. Prophet, developed at Meta, applies exactly this idea to time series by decomposing a signal into trend, seasonality, and user-defined regressor effects. This assignment applies both Prophet and pyGAM to daily Walmart sales and benchmarks them against a seasonal-naive baseline and against your ARIMA/ETS results from Homework 1.
+
+**Learning objectives.** By the end of this assignment you will be able to:
+
+- Decompose a time series into trend, weekly seasonality, yearly seasonality, and external regressors using Prophet
+- Interpret Prophet component plots and connect them to concrete business decisions
+- Fit a pyGAM with a cyclic spline for the annual cycle, a factor term for day of week, and linear terms for binary demand drivers
+- Compare GAM-family models against ARIMA/ETS on a common holdout set using RMSE
+
+---
+
+# Dataset
+
+This homework switches from weekly to **daily** data. Prophet and pyGAM both benefit from finer time granularity: daily data expose intra-week patterns that are averaged away in weekly aggregates, and Prophet's changepoint detection is more reliable with a denser observation grid.
+
+You will work with **store CA_1, FOODS category** — 1,941 daily observations from the M5/Walmart data. Note that this is the same store and category you used in Homework 1 Part 1, but at daily rather than weekly frequency, so you can compare directly against what you already fitted.
+
+The preprocessed file is `data/processed/m5_daily.csv`. If it does not exist, run `python scripts/prep_m5.py` once from the repository root.
+
+```{python}
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from prophet import Prophet
+from pygam import LinearGAM, s, l, f
+import warnings, logging
+warnings.filterwarnings('ignore')
+logging.getLogger('cmdstanpy').setLevel(logging.ERROR)   # Prophet is chatty
+
+from pathlib import Path
+
+def data_path(name):
+    """Find the processed data file whether you render from the repo root or from
+    this file's own folder."""
+    for base in (Path.cwd(), *Path.cwd().parents):
+        p = base / "data" / "processed" / name
+        if p.exists():
+            return p
+    raise FileNotFoundError(
+        f"Could not find data/processed/{name}. "
+        "Run `python scripts/prep_m5.py` from the repository root first."
+    )
+
+daily = pd.read_csv(data_path("m5_daily.csv"), parse_dates=["date"])
+print(f"CA_1 FOODS daily: {len(daily)} observations from "
+      f"{daily['date'].min().date()} to {daily['date'].max().date()}")
+print(daily[["date", "units", "snap", "is_event", "avg_price"]].head())
+```
+
+**The columns you will use:**
+
+| Column | Meaning |
+|--------|---------|
+| `date` | Calendar date |
+| `units` | Units sold that day — the target |
+| `snap` | 1 if SNAP benefits were disbursable in California that day (~33% of days) |
+| `is_event` | 1 if a calendar event fell on that day (holiday, sporting event, religious date) |
+| `avg_price` | Average sell price across the category that day |
+
+::: {.callout-warning}
+::: {.callout-note}
+## Your numbers will not match mine, and that is fine
+
+Every result in this course depends on a random seed, and often also on your library
+versions, your hardware, and how many CPU threads your machine uses. Two people running
+identical, correct code will get different numbers — sometimes noticeably different.
+
+**What is graded** is that you used the right model and the right procedure, and that your
+interpretation follows from the numbers *you* actually obtained. Quote your own output.
+
+**What is not graded** is matching any particular value. Do not tune your way toward a number
+you saw on a slide or heard from a classmate — that is the one way to turn this into a wrong
+answer.
+
+One caveat worth knowing. The broad *ordering* of models usually survives this variation. If
+yours comes out backwards from what the lecture found, say so in a sentence and offer a reason:
+either you have found something real about your run, or there is a bug worth hunting. Both are
+worth more marks than quietly reporting a number you do not believe.
+:::
+
+## One data quirk to find before you model
+
+Run `daily[daily.units == 0]` before you fit anything. There are exactly five such days, and
+they are not missing data — they are real zeros with a real cause. Identify the cause, and
+decide (and state in Q1) whether you leave them in, drop them, or handle them another way.
+Whatever you choose, Prophet will do something with them, so choose deliberately.
+:::
+
+---
+
+# Initial Prompt for Codex
+
+::: {.callout-important}
+## Initial Prompt for Codex
+
+Paste the block below as the very first message in your Codex session before sending any questions. This sets the context that all subsequent prompts build on and does **not** count against your prompt budget.
+
+```
+I am working on Homework 2 for ECON 8310: Business Forecasting at the University of Nebraska at Omaha.
+
+Dataset: M5/Walmart — daily data for store CA_1, FOODS category, at `data/processed/m5_daily.csv`. Columns: date, store_id, cat_id, units (target), avg_price, snap (1 if SNAP benefits disbursable that day), is_event (1 if a calendar event), wday, month, year, and lagged units (units_lag1, units_lag7, units_lag14, units_lag28, units_lag365).
+
+This homework covers Generalized Additive Models (GAMs) using Prophet and pyGAM in Python. I will ask you questions one at a time. For each:
+1. Write clean, well-commented Python code that runs end-to-end
+2. Explain what the output means so that I understand it — but do NOT draft the written
+   answers I submit. The interpretation and business-recommendation sections are mine to
+   write, in my own words.
+
+My prompt budget is 10 (this context prompt is excluded). I will label each question before asking.
+
+
+Repository rules — these apply to every prompt in this thread:
+- My submission folder is `submissions/hw02_<my_name>/`. Put everything there.
+- Keep a `PROMPT_LOG.md` in that folder. For every prompt I send, append a block:
+      ### Prompt <n> — YYYY-MM-DD HH:MM
+      <my prompt, verbatim>
+  Numbered from 1, in order. Never edit or delete an earlier entry. If your tool cannot write
+  files, I will paste them in myself.
+- After finishing the work for each prompt, make exactly one git commit:
+  `hw02 prompt <prompt_id>: <short summary>`
+- If a prompt would take me past my budget of 10, do not do the work. Reply exactly
+  PROMPT_LIMIT_REACHED, and still log that prompt.
+- Never modify `AGENTS.md`, anything in `assignments/`, or anything in `policy/`.
+
+Confirm by responding with: HW02_CONTEXT_ACK
+```
+
+Submit this text as **`INITIAL_PROMPT.md`** in your submission folder.
+:::
+
+---
+
+# Questions
+
+## Q1 — Prophet: Fit and Decompose
+
+*(Suggested prompts: 2)*
+
+Prophet requires the input dataframe to have exactly two columns: `ds` (the date) and `y` (the target variable). The starter code below performs that rename and defines the train/test split. Using that split, fit a Prophet model with the settings listed below, generate a forecast over the test period, and produce both plots described.
+
+**Model settings:**
+
+- Yearly seasonality: enabled
+- Weekly seasonality: enabled
+- `changepoint_prior_scale = 0.05` (allows the trend to bend, but conservatively)
+
+**Plots to produce:**
+
+1. Forecast plot with uncertainty bands (use Prophet's built-in `plot()` method)
+2. Component decomposition plot showing trend, weekly seasonality, and yearly seasonality (use `plot_components()`)
+
+```{python}
+# Prophet requires columns named 'ds' (date) and 'y' (target)
+prophet_df = daily[["date", "units"]].rename(columns={"date": "ds", "units": "y"})
+
+N_TEST = 365                       # hold out the final year
+train_prophet = prophet_df.iloc[:-N_TEST]
+test_prophet  = prophet_df.iloc[-N_TEST:]
+
+print(f"train {len(train_prophet)} days, test {len(test_prophet)} days "
+      f"({test_prophet.ds.min().date()} to {test_prophet.ds.max().date()})")
+
+# Fit Prophet, forecast over the test period, and plot results
+```
+
+> **Your response:** Describe what the component plots reveal. Which day of the week is busiest? Is there a clear annual pattern, and does it have one peak or more than one? What business decisions could a store manager make from these components? State what you did about the five zero days and why.
+
+---
+
+## Q2 — Prophet: Adding Regressors
+
+*(Suggested prompts: 2)*
+
+External regressors allow Prophet to attribute part of the sales signal to known business drivers rather than absorbing them into the trend or seasonality components. The starter code below prepares a dataframe that includes `snap` and `is_event` alongside the required `ds` and `y` columns.
+
+**(a)** Add `snap` and `is_event` as additional regressors using `add_regressor()`, then re-fit on the same training set. Compute test RMSE for this model and for the baseline from Q1. Present both in a small summary table.
+
+**(b)** Extract the regressor coefficients using `prophet.utilities.regressor_coefficients()`. Report the estimated lift (in units) attributable to a SNAP day, and the effect of an event day. Interpret both magnitudes relative to average daily sales — is each large or small?
+
+::: {.callout-note}
+## Why SNAP is the interesting one
+
+SNAP (the Supplemental Nutrition Assistance Program) benefits are disbursed on fixed calendar
+days that vary by state. California's schedule puts them on roughly the first ten days of each
+month. This is a **known, published, future-dated schedule** — you always know next year's SNAP
+days in advance. That is what makes it usable as a forecasting regressor, and it is the property
+you should look for when someone proposes a predictor.
+:::
+
+```{python}
+# Add regressor columns to the dataframe before fitting
+prophet_reg_df = daily[["date", "units", "snap", "is_event"]].rename(
+    columns={"date": "ds", "units": "y"}
+)
+
+# Fit Prophet with snap and is_event as additional regressors
+# Compare RMSE with and without regressors
+# Extract and report regressor coefficients
+```
+
+> **Your response:** Is the SNAP effect large enough to be actionable? Name one concrete operational decision — staffing, ordering, or promotion timing — that this number would change, and say what you would need to check before acting on it.
+
+---
+
+## Q3 — pyGAM
+
+*(Suggested prompts: 2)*
+
+pyGAM fits an additive model directly on a feature matrix rather than on a time index, which makes it easy to include calendar-derived features and binary indicators side by side. The starter code below derives `day_of_year` and `day_of_week` from the `date` column and constructs training and test arrays.
+
+Fit a `LinearGAM` with the following four terms:
+
+| Term | Predictor | Type | Purpose |
+|------|-----------|------|---------|
+| `s(0, basis="cp")` | `day_of_year` (1–366) | Cyclic spline | Annual cycle, with Dec 31 joined to Jan 1 |
+| `f(1)` | `day_of_week` (0–6) | Factor | Within-week pattern |
+| `l(2)` | `snap` | Linear | SNAP benefit-day lift |
+| `l(3)` | `is_event` | Linear | Calendar event effect |
+
+Two of those choices are deliberate and you should be able to defend them. **`basis="cp"`** makes
+the spline *cyclic*, so the fitted curve meets itself at the year boundary instead of being free
+to jump between December 31 and January 1. And **`f(1)` rather than `s(1)`**: day of week takes
+seven discrete values with no meaningful "between," so a factor term is the honest choice — a
+smooth spline would interpolate a fractional Wednesday-and-a-half.
+
+After fitting, compute test RMSE. Then plot the partial dependence curves for `day_of_year` and `day_of_week` using the model's `plot_partial_dependence()` method or by calling `partial_dependence()` manually.
+
+```{python}
+from pygam import LinearGAM, s, l, f
+
+daily["day_of_year"] = daily["date"].dt.dayofyear
+daily["day_of_week"] = daily["date"].dt.dayofweek
+
+features = ["day_of_year", "day_of_week", "snap", "is_event"]
+X_train = daily.iloc[:-N_TEST][features].values
+y_train = daily.iloc[:-N_TEST]["units"].values
+X_test  = daily.iloc[-N_TEST:][features].values
+y_test  = daily.iloc[-N_TEST:]["units"].values
+
+# Fit LinearGAM, compute test RMSE, plot partial dependence for day_of_year and day_of_week
+```
+
+> **Your response:** Look at the partial dependence plot for `day_of_week`. Which day has the highest predicted sales, all else equal? Does that match the Prophet weekly component from Q1? Then look at the confidence band on the `day_of_year` curve and say where it is widest — and explain why it is widest there.
+
+---
+
+## Q4 — Model Comparison
+
+*(Suggested prompts: 2)*
+
+Collect the test-set RMSE values from Q1, Q2, and Q3 into the summary table below. Fill in the best RMSE you recorded from Homework 1 in the final row.
+
+| Model | Test RMSE | Notes |
+|-------|-----------|-------|
+| Seasonal naive (364 days back) | | the benchmark every model must beat |
+| Prophet (no regressors) | | |
+| Prophet (with regressors) | | |
+| pyGAM | | |
+| Best HW1 model (ARIMA or ETS) | *from HW1* | note that HW1 was **weekly**, not daily |
+
+Compute the seasonal-naive benchmark yourself: predict each test day using the value 364 days
+earlier (364 rather than 365 keeps the day of week aligned). A model that cannot beat this is not
+earning its complexity.
+
+Then produce a single figure showing actual versus predicted for the three fitted models over the
+test period, with distinct colors and a legend.
+
+```{python}
+# Compute the seasonal-naive benchmark, then collect RMSE values from Q1, Q2, Q3
+# Plot actual vs predicted for the test period for Prophet (both variants) and pyGAM
+# Use a single figure with distinct colors and a legend
+```
+
+::: {.callout-warning}
+## Comparing against Homework 1 honestly
+
+Your HW1 models were fitted on **weekly** data and this homework is **daily**. RMSE on weekly
+units and RMSE on daily units are not the same quantity and must not be put side by side as if
+they were. If you want a genuine comparison, say explicitly what you would have to do to make it
+one — you do not have to carry it out.
+:::
+
+> **Your response:** Which model gives the best holdout RMSE, and by how much over the benchmark? Which is most interpretable to a non-technical manager? Would you recommend different models for different uses — next-week staffing versus an annual budget — and why?
+
+---
+
+## Q5 — Reflection
+
+*(Suggested prompts: 0 — write yourself)*
+
+No code required for this question. Write 150–200 words in response to the following scenario.
+
+You are presenting to a Walmart regional operations team that currently forecasts store-level demand with a simple 4-week moving average. Explain why a GAM-based approach (Prophet or pyGAM) would be an upgrade. Identify at least two specific insights from your component plots that you would put in front of this audience — one of them should be the SNAP effect, stated as a number with its operational implication. Close by disclosing at least one meaningful limitation of GAMs the team should understand before adopting the approach.
+
+> **Your response:**
+
+---
+
+# Submission Checklist
+
+Before submitting, confirm each item below is complete.
+
+- [ ] All code cells run without errors from a clean kernel restart
+- [ ] Written responses completed in your own words (not copied from Codex output)
+- [ ] `INITIAL_PROMPT.md` saved in your submission folder
+- [ ] `PROMPT_LOG.md` complete with 10 or fewer entries
+- [ ] One git commit per Codex prompt, with message format `hw02 prompt <id>: <summary>`
+- [ ] `REPORT.md` containing a plain-English business recommendation (one paragraph)
