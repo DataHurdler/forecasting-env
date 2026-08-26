@@ -17,6 +17,7 @@ Course website: <https://datahurdler.github.io/Forecasting-Course/>
 | `scripts/` | Data preparation, and `check_my_submission.py` to run before you push. |
 | `submissions/` | Your work. One folder per assignment. |
 | `policy/` | Prompt budgets and read-only paths. |
+| `QUARTO_GUIDE.md` | Setting up VS Code and Quarto, and how to work in a `.qmd`. **Start here.** |
 | `AI_POLICY.md` | How to use an AI assistant on this course. Read it once. |
 
 ---

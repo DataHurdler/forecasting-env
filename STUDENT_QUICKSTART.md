@@ -20,7 +20,9 @@ without it even though nothing in your code imports it.
 
 **macOS only, before Week 5:** `brew install libomp`, once. Without it `import xgboost` fails.
 
-**Install Quarto** from <https://quarto.org/docs/get-started/>. You render your assignment with it.
+**Install Quarto** from <https://quarto.org/docs/get-started/>, and **VS Code** with the Quarto
+extension. Full step-by-step instructions, plus what a `.qmd` file actually is and the four errors
+you will hit: **[QUARTO_GUIDE.md](QUARTO_GUIDE.md)**. Read that first if you have not used Quarto.
 
 ---
 
