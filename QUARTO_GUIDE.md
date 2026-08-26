@@ -45,13 +45,19 @@ quarto --version
 
 Any 1.4 or newer is fine.
 
-## 3. VS Code and the Quarto extension
+## 3. An editor — pick one
 
-**Install VS Code** from <https://code.visualstudio.com/>.
+**Either of these works well. Choose one and stick with it.**
 
-**Then install two extensions.** Click the Extensions icon in the left sidebar — it looks like
-four squares with one detached — or press `Ctrl+Shift+X` (`Cmd+Shift+X` on Mac). Search for and
-install:
+### Option A — VS Code
+
+The most widely used editor in the industry, and the one you are most likely to meet again after
+this course.
+
+1. Install from <https://code.visualstudio.com/>
+2. Click the Extensions icon in the left sidebar — four squares, one detached — or press
+   `Ctrl+Shift+X` (`Cmd+Shift+X` on Mac)
+3. Search for and install **two** extensions:
 
 | Extension | Publisher | Why |
 |---|---|---|
@@ -60,13 +66,35 @@ install:
 
 Both are free.
 
-**Then open this repository as a folder** — File → Open Folder → select the repository. Not a
-single file; the whole folder. Quarto needs to see the project.
+### Option B — Positron
+
+Posit's editor, purpose-built for data science. **Quarto support is built in** — no extensions to
+install — and it shows your variables and plots in dedicated panes, which many people find easier
+when working with data.
+
+1. Install from <https://positron.posit.co/>
+2. That is the whole setup
+
+If you have used RStudio, Positron will feel familiar immediately.
+
+### Which should you choose?
+
+Neither is wrong, and every instruction in this course works in both.
+
+- **VS Code** if you want the more transferable skill, or you already use it for something else.
+  More people use it, so more of the answers you find online will match what you see.
+- **Positron** if you want less setup and a layout designed around data work. Fewer steps to get
+  running, and the variable and plot panes are genuinely nice.
+
+## Open the repository as a *folder*
+
+Whichever you chose: **File → Open Folder** → select the repository folder. Not a single file —
+the whole folder. Both editors need to see the project to resolve data paths correctly.
 
 ## Check it works
 
-Open any assignment in `assignments/` and click **Render** in the top-right of the editor. A
-preview should appear beside your code. If it does, you are set up.
+Open any assignment in `assignments/` and click **Render**. A preview should appear beside your
+code. If it does, you are set up.
 
 ---
 
@@ -185,16 +213,14 @@ Render, then check, then push.
 
 ---
 
-# Alternatives to VS Code
+# Other editors
 
-**[Positron](https://positron.posit.co/)** — Posit's data-science IDE, with Quarto support built
-in rather than added by extension. A good choice, and if you have used RStudio it will feel
-familiar.
+**RStudio** also renders `.qmd`, though Python environment setup takes more configuring than in
+either VS Code or Positron. Workable if it is what you already have.
 
-**RStudio** also renders `.qmd`, though Python setup takes more configuring than in VS Code.
-
-**Google Colab does not support `.qmd` files.** It is a notebook environment with no Quarto. You
-cannot complete these assignments in Colab.
+**Google Colab does not support `.qmd` files.** It is a notebook environment with no Quarto
+installed and no way to add it. You cannot complete these assignments in Colab — please set up
+VS Code or Positron instead.
 
 ---
 
