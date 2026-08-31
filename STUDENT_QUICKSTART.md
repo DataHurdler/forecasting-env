@@ -1,12 +1,31 @@
 # Start Here
 
-Everything you need for ECON 8310 homework is in this repository.
+## Which repository am I looking at?
+
+There are **two** ECON 8310 repositories, and you only ever clone one of them.
+
+| Repository | What it holds | What you do with it |
+|---|---|---|
+| **`forecasting-env`** — *this one* | The assignments, the datasets, and the folder your work goes into | **Clone it.** Every homework you write and submit lives here |
+| `forecasting-course` | Slides, labs, and the syllabus — the teaching materials | Nothing. You read these on the web, not in a clone |
+
+**Course website** (slides, labs, syllabus): <https://www.luozijun.com/forecasting-course/>
+
+If you are looking for a lecture or an in-class lab, it is on the website. If you are looking for
+homework, it is here. Everything you need for ECON 8310 **homework** is in this repository.
 
 ---
 
 ## 1. One-time setup
 
-**Get the repository onto your machine.** Clone it, or download the ZIP and unzip it.
+**Get this repository onto your machine.**
+
+```bash
+git clone https://github.com/DataHurdler/forecasting-env.git
+```
+
+Or open <https://github.com/DataHurdler/forecasting-env>, click the green **Code** button, and
+download the ZIP — then unzip it somewhere you will find again.
 
 **Set up Python.** You need Python 3.10 or newer and these packages:
 
@@ -59,7 +78,7 @@ python scripts/prep_electricity.py   # hourly demand, Lecture 3
    Use the exact assignment name for the folder prefix — `hw01_part1`, `hw05_part2`, and so on.
    It is written at the top of each assignment.
 
-2. Open the assignment and find **Initial Prompt for Codex**. Send that block as the first
+2. Open the assignment and find **Initial Prompt for Your AI Assistant**. Send that block as the first
    message to whichever AI assistant you are using. Save it as `INITIAL_PROMPT.md` in your folder.
 
 3. Work through the questions. Fill in the code chunks and write the answers.

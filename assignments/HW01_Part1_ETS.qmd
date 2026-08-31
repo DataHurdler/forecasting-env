@@ -7,7 +7,7 @@ format:
     theme: cosmo
     toc: true
     toc-depth: 3
-    number-sections: true
+    number-sections: false
     code-fold: false
     self-contained: true
 execute:
@@ -20,7 +20,7 @@ execute:
 
 Homework 1 comes in two parts. **Part 1 (this document)** covers exponential smoothing and is due before class in Week 2 — it uses only material from Lecture 1. **Part 2** covers ARIMA, VAR, and method comparison, and is due before class in Week 3, after Lecture 2.
 
-Each part has its own Codex context prompt, its own prompt budget, and its own submission. Do not start Part 2 until Part 1 is submitted.
+Each part has its own context prompt, its own prompt budget, and its own submission. Do not start Part 2 until Part 1 is submitted.
 
 Exponential smoothing is a workhorse of operational forecasting in retail and supply chain: interpretable, cheap to fit, and hard to beat at scale. Working through real store-level sales data, you will see how the choice of smoothing model and the rigor of evaluation translate directly into business decisions.
 
@@ -76,7 +76,10 @@ print(f"CA_1 FOODS: {len(ca1)} weekly observations "
 
 ---
 
-# Initial Prompt for Codex
+# Initial Prompt for Your AI Assistant
+
+*Any assistant works — ChatGPT, Claude, Gemini, or Copilot, in an editor or in a browser tab.
+Paste the block below as your **first** message, before you ask anything else.*
 
 ::: {.callout-important}
 ::: {.callout-note}
@@ -99,9 +102,9 @@ either you have found something real about your run, or there is a bug worth hun
 worth more marks than quietly reporting a number you do not believe.
 :::
 
-## Initial Prompt for Codex
+## Initial Prompt for Your AI Assistant
 
-Paste the block below as the very first message in your Codex session before sending any questions. This sets the context that all subsequent prompts build on and does **not** count against your prompt budget.
+Paste the block below as the very first message in your assistant session before sending any questions. This sets the context that all subsequent prompts build on and does **not** count against your prompt budget.
 
 ```
 I am working on Homework 1, Part 1 for ECON 8310: Business Forecasting at the University of Nebraska at Omaha.
@@ -201,7 +204,7 @@ Before submitting Part 1, confirm each item below.
 - [ ] All code cells run without errors from top to bottom (Kernel → Restart & Run All)
 - [ ] Written responses are completed in your own words — AI-generated prose is not accepted for written sections
 - [ ] `INITIAL_PROMPT.md` is saved in your Part 1 submission folder
-- [ ] `PROMPT_LOG.md` is complete with **4 or fewer** entries (one entry per Codex prompt sent)
-- [ ] One git commit per Codex prompt used, following the format: `hw01_part1 prompt <id>: <one-line summary>`
+- [ ] `PROMPT_LOG.md` is complete with **4 or fewer** entries (one entry per prompt sent)
+- [ ] One git commit per prompt used, following the format: `hw01_part1 prompt <id>: <one-line summary>`
 
 *Part 2 is due before class in Week 3 and carries its own prompt budget. The business recommendation `REPORT.md` is submitted with Part 2, once you have results from all five questions.*

@@ -7,7 +7,7 @@ format:
     theme: cosmo
     toc: true
     toc-depth: 3
-    number-sections: true
+    number-sections: false
     code-fold: false
     self-contained: true
 execute:
@@ -108,12 +108,15 @@ Whatever you choose, Prophet will do something with them, so choose deliberately
 
 ---
 
-# Initial Prompt for Codex
+# Initial Prompt for Your AI Assistant
+
+*Any assistant works — ChatGPT, Claude, Gemini, or Copilot, in an editor or in a browser tab.
+Paste the block below as your **first** message, before you ask anything else.*
 
 ::: {.callout-important}
-## Initial Prompt for Codex
+## Initial Prompt for Your AI Assistant
 
-Paste the block below as the very first message in your Codex session before sending any questions. This sets the context that all subsequent prompts build on and does **not** count against your prompt budget.
+Paste the block below as the very first message in your assistant session before sending any questions. This sets the context that all subsequent prompts build on and does **not** count against your prompt budget.
 
 ```
 I am working on Homework 2 for ECON 8310: Business Forecasting at the University of Nebraska at Omaha.
@@ -321,8 +324,8 @@ You are presenting to a Walmart regional operations team that currently forecast
 Before submitting, confirm each item below is complete.
 
 - [ ] All code cells run without errors from a clean kernel restart
-- [ ] Written responses completed in your own words (not copied from Codex output)
+- [ ] Written responses completed in your own words (not copied from your assistant's output)
 - [ ] `INITIAL_PROMPT.md` saved in your submission folder
 - [ ] `PROMPT_LOG.md` complete with 10 or fewer entries
-- [ ] One git commit per Codex prompt, with message format `hw02 prompt <id>: <summary>`
+- [ ] One git commit per prompt, with message format `hw02 prompt <id>: <summary>`
 - [ ] `REPORT.md` containing a plain-English business recommendation (one paragraph)

@@ -7,7 +7,7 @@ format:
     theme: cosmo
     toc: true
     toc-depth: 3
-    number-sections: true
+    number-sections: false
     code-fold: false
     self-contained: true
 execute:
@@ -105,12 +105,15 @@ rather than the numbers.
 
 ---
 
-## Initial Prompt for Codex
+## Initial Prompt for Your AI Assistant
+
+*Any assistant works — ChatGPT, Claude, Gemini, or Copilot, in an editor or in a browser tab.
+Paste the block below as your **first** message, before you ask anything else.*
 
 ::: {.callout-important}
-## Initial Prompt for Codex
+## Initial Prompt for Your AI Assistant
 
-Paste this as the very first message in your Codex session. It does **not** count against your
+Paste this as the very first message in your assistant session. It does **not** count against your
 prompt budget.
 
 ```
@@ -325,5 +328,5 @@ difference matters when you have groups with very different amounts of data.
 - [ ] Written responses completed in your own words
 - [ ] `INITIAL_PROMPT.md` saved in `submissions/hw06_part2_<your_name>/`
 - [ ] `PROMPT_LOG.md` complete with **9 or fewer** entries for Part 2
-- [ ] One git commit per Codex prompt (`hw06_part2 prompt <id>: <short summary>`)
+- [ ] One git commit per prompt (`hw06_part2 prompt <id>: <short summary>`)
 - [ ] `REPORT.md` with a clear business recommendation

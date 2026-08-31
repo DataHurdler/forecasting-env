@@ -4,7 +4,7 @@ Business Forecasting · University of Nebraska at Omaha · Fall 2026
 
 **New here? Read [STUDENT_QUICKSTART.md](STUDENT_QUICKSTART.md).**
 
-Course website: <https://datahurdler.github.io/Forecasting-Course/>
+Course website: <https://www.luozijun.com/forecasting-course/>
 
 ---
 

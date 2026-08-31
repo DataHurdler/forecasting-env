@@ -7,7 +7,7 @@ format:
     theme: cosmo
     toc: true
     toc-depth: 3
-    number-sections: true
+    number-sections: false
     code-fold: false
     self-contained: true
 execute:
@@ -111,12 +111,15 @@ the test period into training — the same error as scaling outside a CV fold in
 
 ---
 
-## Initial Prompt for Codex
+## Initial Prompt for Your AI Assistant
+
+*Any assistant works — ChatGPT, Claude, Gemini, or Copilot, in an editor or in a browser tab.
+Paste the block below as your **first** message, before you ask anything else.*
 
 ::: {.callout-important}
-## Initial Prompt for Codex
+## Initial Prompt for Your AI Assistant
 
-Paste the following as your first message to Codex. Save it as `INITIAL_PROMPT.md`
+Paste the following as your first message to your assistant. Save it as `INITIAL_PROMPT.md`
 in your submission folder.
 
 ```
@@ -174,7 +177,8 @@ WINDOW_B = 52
 
 ### Q1 — Vanilla RNN *(Suggested prompts: 3)*
 
-The simplest recurrent model, and the one Lecture 9 found hardest to beat.
+The simplest recurrent model, and the one Lecture 9 found hardest to beat at a fixed
+training budget.
 
 - `nn.RNN(input_size=4, hidden_size=64, batch_first=True)`
 - Take the **final** hidden state and pass it through `Linear(64 → 1)`
@@ -217,6 +221,12 @@ class LSTMForecaster(nn.Module):
 > parameters of the RNN at the same hidden size — explain where they go. Then: did the extra
 > capacity buy you accuracy? If not, what does that say about whether this problem has the kind
 > of long-range dependency gating is designed to preserve?
+>
+> **And one check before you commit to that answer.** Both models trained for the same 40 epochs.
+> A model with four times the parameters does not necessarily finish learning at the same point as
+> a smaller one — Lecture 9 Part 1 found the RNN's margin was *largest* at the budget it happened
+> to use, and gone by 100 epochs. Retrain both for 100 epochs and report whether your ranking
+> survives. If it does not, say which claim your original table actually supported.
 
 ---
 
@@ -253,4 +263,4 @@ class TransformerForecaster(nn.Module):
 - [ ] Written responses completed in your own words
 - [ ] `INITIAL_PROMPT.md` saved in `submissions/hw05_part2_<your_name>/`
 - [ ] `PROMPT_LOG.md` complete with **10 or fewer** entries for Part 2
-- [ ] One git commit per Codex prompt (`hw05_part2 prompt <id>: <short summary>`)
+- [ ] One git commit per prompt (`hw05_part2 prompt <id>: <short summary>`)

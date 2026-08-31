@@ -2,7 +2,7 @@
 
 **This file no longer contains a prompt to paste.**
 
-Each assignment carries its own initial prompt, under the heading **"Initial Prompt for Codex"**
+Each assignment carries its own initial prompt, under the heading **"Initial Prompt for Your AI Assistant"**
 near the top of the file. That prompt is specific to the assignment: it describes the dataset,
 scopes what the assignment does and does not cover, states that assignment's prompt budget, and
 carries the repository rules.

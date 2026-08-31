@@ -7,7 +7,7 @@ format:
     theme: cosmo
     toc: true
     toc-depth: 3
-    number-sections: true
+    number-sections: false
     code-fold: false
     self-contained: true
 execute:
@@ -129,12 +129,15 @@ the test period into training — the same error as scaling outside a CV fold in
 
 ---
 
-## Initial Prompt for Codex
+## Initial Prompt for Your AI Assistant
+
+*Any assistant works — ChatGPT, Claude, Gemini, or Copilot, in an editor or in a browser tab.
+Paste the block below as your **first** message, before you ask anything else.*
 
 ::: {.callout-important}
-## Initial Prompt for Codex
+## Initial Prompt for Your AI Assistant
 
-Paste the following as your first message to Codex. Save it as `INITIAL_PROMPT.md`
+Paste the following as your first message to your assistant. Save it as `INITIAL_PROMPT.md`
 in your submission folder.
 
 ```
@@ -293,4 +296,4 @@ Retrain the CNN at windows of **13, 26 and 52** weeks. Report test RMSE for each
 - [ ] Written responses completed in your own words
 - [ ] `INITIAL_PROMPT.md` saved in `submissions/hw05_part1_<your_name>/`
 - [ ] `PROMPT_LOG.md` complete with **9 or fewer** entries for Part 1
-- [ ] One git commit per Codex prompt (`hw05_part1 prompt <id>: <short summary>`)
+- [ ] One git commit per prompt (`hw05_part1 prompt <id>: <short summary>`)

@@ -7,7 +7,7 @@ format:
     theme: cosmo
     toc: true
     toc-depth: 3
-    number-sections: true
+    number-sections: false
     code-fold: false
     self-contained: true
 execute:
@@ -96,7 +96,10 @@ print(f"Modeling dataset: {len(df):,} store-category-week rows, "
 
 ---
 
-# Initial Prompt for Codex
+# Initial Prompt for Your AI Assistant
+
+*Any assistant works — ChatGPT, Claude, Gemini, or Copilot, in an editor or in a browser tab.
+Paste the block below as your **first** message, before you ask anything else.*
 
 ::: {.callout-important}
 ::: {.callout-note}
@@ -119,9 +122,9 @@ either you have found something real about your run, or there is a bug worth hun
 worth more marks than quietly reporting a number you do not believe.
 :::
 
-## Initial Prompt for Codex
+## Initial Prompt for Your AI Assistant
 
-Paste the block below as the very first message in your Codex session before sending any questions. This sets the context that all subsequent prompts build on and does **not** count against your prompt budget.
+Paste the block below as the very first message in your assistant session before sending any questions. This sets the context that all subsequent prompts build on and does **not** count against your prompt budget.
 
 ```
 I am working on Homework 3 for ECON 8310: Business Forecasting at the University of Nebraska at Omaha.
@@ -334,8 +337,8 @@ Write a short memo of 150–200 words addressing three points:
 Before submitting, confirm each item below is complete.
 
 - [ ] All code cells run without errors from a clean kernel restart
-- [ ] Written responses completed in your own words (not copied from Codex output)
+- [ ] Written responses completed in your own words (not copied from your assistant's output)
 - [ ] `INITIAL_PROMPT.md` saved in your submission folder
 - [ ] `PROMPT_LOG.md` complete with 12 or fewer entries
-- [ ] One git commit per Codex prompt, with message format `hw03 prompt <id>: <summary>`
+- [ ] One git commit per prompt, with message format `hw03 prompt <id>: <summary>`
 - [ ] `REPORT.md` containing a plain-English business recommendation (one paragraph)

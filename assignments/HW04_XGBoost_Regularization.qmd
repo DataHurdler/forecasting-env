@@ -7,7 +7,7 @@ format:
     theme: cosmo
     toc: true
     toc-depth: 3
-    number-sections: true
+    number-sections: false
     code-fold: false
     self-contained: true
 execute:
@@ -155,12 +155,15 @@ going further. Every model below is measured against it.
 
 ---
 
-## Initial Prompt for Codex
+## Initial Prompt for Your AI Assistant
+
+*Any assistant works — ChatGPT, Claude, Gemini, or Copilot, in an editor or in a browser tab.
+Paste the block below as your **first** message, before you ask anything else.*
 
 ::: {.callout-important}
-## Initial Prompt for Codex
+## Initial Prompt for Your AI Assistant
 
-Paste the following as your first message to Codex. Save it as `INITIAL_PROMPT.md`
+Paste the following as your first message to your assistant. Save it as `INITIAL_PROMPT.md`
 in your submission folder.
 
 ```
@@ -428,5 +431,5 @@ Before submitting, confirm:
 - [ ] Written responses completed in your own words (not AI-generated prose)
 - [ ] `INITIAL_PROMPT.md` saved in `submissions/hw04_<your_name>/`
 - [ ] `PROMPT_LOG.md` complete with ≤ 12 entries
-- [ ] One git commit per Codex prompt (`hw04 prompt <id>: <short summary>`)
+- [ ] One git commit per prompt (`hw04 prompt <id>: <short summary>`)
 - [ ] `REPORT.md` with a clear business recommendation

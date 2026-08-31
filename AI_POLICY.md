@@ -6,8 +6,9 @@ This course expects you to use an AI assistant. This page says how.
 
 ## Any tool is fine
 
-Codex, GitHub Copilot, ChatGPT, Claude, Gemini — in an editor or in a browser tab. Use what you
-have.
+ChatGPT, Claude, Gemini, GitHub Copilot, Codex — in an editor or in a browser tab. Use what you
+have. UNO's ChatGPT Edu workspace does **not** include Codex, so nothing in these assignments
+requires it; every initial prompt is written for whatever assistant you have.
 
 If your tool cannot run code or write files, you will copy code across, run it yourself, and paste
 results back. **That is a perfectly good way to do this course**, and arguably a better one: you

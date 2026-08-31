@@ -14,4 +14,4 @@ Each assignment contains everything you need: the dataset description, the quest
 budget, and the **Initial Prompt** to send your AI assistant before you begin.
 
 Rendered versions are on the course website if you would rather read them in a browser:
-<https://datahurdler.github.io/Forecasting-Course/>
+<https://www.luozijun.com/forecasting-course/>
