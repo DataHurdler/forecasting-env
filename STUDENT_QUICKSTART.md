@@ -7,11 +7,13 @@ There are **two** ECON 8310 repositories, and you only ever clone one of them.
 | Repository | What it holds | What you do with it |
 |---|---|---|
 | **`forecasting-env`** — *this one* | The assignments, the datasets, and the folder your work goes into | **Clone it.** Every homework you write and submit lives here |
-| `forecasting-course` | Slides, labs, and the syllabus — the teaching materials | Nothing. You read these on the web, not in a clone |
+| `forecasting-course` | Slides, labs, assignments, the book and the workbook — the teaching materials | Nothing. You read these on the web, not in a clone |
 
-**Course website** (slides, labs, syllabus): <https://www.luozijun.com/forecasting-course/>
+**Course website** (slides, labs, assignments, book, workbook): <https://www.luozijun.com/forecasting-course/>
 
-If you are looking for a lecture or an in-class lab, it is on the website. If you are looking for
+Your **syllabus, the term calendar and lecture recordings are on Canvas**, not on the website.
+
+If you are looking for a lecture or a lab, it is on the website. If you are looking for
 homework, it is here. Everything you need for ECON 8310 **homework** is in this repository.
 
 ---
@@ -46,6 +48,8 @@ Full step-by-step setup, what a `.qmd` file actually is, and the four errors you
 **[QUARTO_GUIDE.md](QUARTO_GUIDE.md)**. Read that first if you have not used Quarto before.
 
 **Google Colab will not work** — it cannot open `.qmd` files.
+
+**When something breaks**, read [Troubleshooting](https://www.luozijun.com/forecasting-course/files/troubleshooting.html) — it covers the failures this course actually produces, and it is faster than waiting on a reply.
 
 ---
 
