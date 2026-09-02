@@ -110,20 +110,32 @@ No arguments. It tells you what is missing. **The most common way to lose marks 
 
 ## 5. Submit
 
-Three ways. Any of them is fine.
+**Submit on Canvas.** Open the assignment and upload the contents of your submission folder:
 
-**Command line**
+| File | |
+|---|---|
+| `HWxx.html` | the rendered document — **self-contained**, so this one file carries all your code, output and figures |
+| `HWxx.qmd` | the source |
+| `PROMPT_LOG.md` | every prompt you sent, numbered |
+| `INITIAL_PROMPT.md` | the context prompt you started with |
+| `REPORT.md` | only where the assignment asks for one |
 
-```bash
-git add submissions/hw01_part1_<yourname>
-git commit -m "hw01_part1: submission"
-git push
-```
+Attach them individually, or zip the folder and upload that. Either is fine.
 
-**GitHub Desktop** — <https://desktop.github.com>. Point it at this folder, write a summary,
-click Commit, then Push. No commands to remember.
+**Upload before the deadline. The Canvas timestamp is submission time.**
 
-**Your browser** — go to your repository on github.com, open the `submissions/` folder,
-**Add file → Upload files**, and drag your folder in. This needs no git knowledge at all.
+### You never push to this repository
 
-Push before the deadline. Push time is submission time.
+This repository is your **working folder**, not your submission. It is mine, and you do not have
+write access — `git push` will fail, and that is expected, not something you have broken.
+
+Two things follow:
+
+- **`git pull` is useful.** If an assignment is corrected during the term, pulling brings you the
+  fix without re-downloading anything.
+- **Committing locally still works.** A clone with no remote is a perfectly good local history.
+  Commit as often as you like; it costs nothing and it is a good habit.
+
+Keeping your own copy on GitHub is **optional and entirely up to you**. If you do it, **make the
+repository private** — a fork of a public repository is always public, and a public copy would put
+your work and your prompt log in front of the whole class.

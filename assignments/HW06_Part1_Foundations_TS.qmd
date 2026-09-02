@@ -278,5 +278,9 @@ Report three things: RMSE, the seasonal-naive RMSE for comparison, and the **cov
 - [ ] Written responses completed in your own words
 - [ ] `INITIAL_PROMPT.md` saved in `submissions/hw06_part1_<your_name>/`
 - [ ] `PROMPT_LOG.md` complete with **10 or fewer** entries for Part 1
-- [ ] One git commit per prompt (`hw06_part1 prompt <id>: <short summary>`)
+- [ ] Every file above uploaded to the **Canvas** assignment
+
+*Not graded, but worth doing:* commit locally once per prompt, `hw06_part1 prompt <id>: <summary>`.
+Nobody sees these — they are your own record of which prompt produced what, and they make it
+far easier to retrace your steps when something breaks.
 - [ ] `REPORT.md` with a clear business recommendation

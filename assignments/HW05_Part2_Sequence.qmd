@@ -266,4 +266,8 @@ class TransformerForecaster(nn.Module):
 - [ ] Written responses completed in your own words
 - [ ] `INITIAL_PROMPT.md` saved in `submissions/hw05_part2_<your_name>/`
 - [ ] `PROMPT_LOG.md` complete with **10 or fewer** entries for Part 2
-- [ ] One git commit per prompt (`hw05_part2 prompt <id>: <short summary>`)
+- [ ] Every file above uploaded to the **Canvas** assignment
+
+*Not graded, but worth doing:* commit locally once per prompt, `hw05_part2 prompt <id>: <summary>`.
+Nobody sees these — they are your own record of which prompt produced what, and they make it
+far easier to retrace your steps when something breaks.

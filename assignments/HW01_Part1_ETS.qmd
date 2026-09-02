@@ -208,6 +208,10 @@ Before submitting Part 1, confirm each item below.
 - [ ] Written responses are completed in your own words — AI-generated prose is not accepted for written sections
 - [ ] `INITIAL_PROMPT.md` is saved in your Part 1 submission folder
 - [ ] `PROMPT_LOG.md` is complete with **4 or fewer** entries (one entry per prompt sent)
-- [ ] One git commit per prompt used, following the format: `hw01_part1 prompt <id>: <one-line summary>`
+- [ ] Every file above uploaded to the **Canvas** assignment
+
+*Not graded, but worth doing:* commit locally once per prompt, `hw01_part1 prompt <id>: <summary>`.
+Nobody sees these — they are your own record of which prompt produced what, and they make it
+far easier to retrace your steps when something breaks.
 
 *Part 2 is due before class in Week 3 and carries its own prompt budget. The business recommendation `REPORT.md` is submitted with Part 2, once you have results from all five questions.*

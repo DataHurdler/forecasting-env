@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check your homework submission before you push it.
+"""Check your homework submission before you upload it to Canvas.
 
     python scripts/check_my_submission.py
 
@@ -85,9 +85,9 @@ def main() -> int:
     total = sum(check(f, budgets()) for f in folders)
     print()
     if total == 0:
-        print(f"{G}Nothing to fix. Commit and push.{X}")
+        print(f"{G}Nothing to fix. Upload these files to the Canvas assignment.{X}")
     else:
-        print(f"{R}{total} thing(s) to fix{X} before you push. Notes are advisory; FIX lines are not.")
+        print(f"{R}{total} thing(s) to fix{X} before you submit. Notes are advisory; FIX lines are not.")
     return 0
 
 if __name__ == "__main__":
