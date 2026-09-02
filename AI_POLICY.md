@@ -14,6 +14,39 @@ If your tool cannot run code or write files, you will copy code across, run it y
 results back. **That is a perfectly good way to do this course**, and arguably a better one: you
 will see every error message with your own eyes, which is where a lot of the learning is.
 
+**If you want an assistant inside your editor**, GitHub Copilot is free for verified students
+through [GitHub Education](https://education.github.com/) and works natively in VS Code. Apply
+early rather than the night before Homework 1 — eligibility is verified, and it is re-checked
+periodically.
+
+---
+
+## Working in a browser chat
+
+Everything below applies if your assistant lives in a browser tab and cannot touch your files.
+
+**You do not need to share the data.** Every assignment's initial prompt already describes the
+dataset column by column — that is why it is written the way it is. An assistant can write correct
+code for `m5_weekly.csv` without ever seeing the file. If something looks wrong and you want the
+assistant to see the data, paste the output of `df.head()` and `df.dtypes`. That is almost always
+enough.
+
+**If you do upload the file, upload it so the assistant can *see* it, not so it can *run* it.**
+The prepared files are small enough to attach — `m5_weekly.csv` is 657 KB — and a chat assistant
+will happily run an analysis on an uploaded copy and hand you finished numbers and plots. Those
+numbers came out of its environment, not yours.
+
+> **What is graded is the interpretation of your own output.** Your `.qmd` has to render on your
+> machine, and your written answers have to follow from the numbers *that render* produced. A
+> result you got from a chat sandbox and cannot reproduce locally is worse than a modest result
+> you can.
+
+**The file and git rules are yours.** Each assignment's initial prompt tells the assistant where to
+put files and how to commit. A browser chat cannot do either — so it should tell you what to write
+and what to commit, and you do it. That costs nothing in marks. Submitting through the browser
+needs no git at all: on github.com open `submissions/`, choose **Add file → Upload files**, and
+drag your folder in ([STUDENT_QUICKSTART.md](STUDENT_QUICKSTART.md) has all three routes).
+
 ---
 
 ## Your prompt log

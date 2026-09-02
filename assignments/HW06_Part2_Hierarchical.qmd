@@ -1,6 +1,6 @@
 ---
 title: "Homework 6: Bayesian Foundations, Time Series, and Hierarchical Models"
-subtitle: "ECON 8310: Business Forecasting — University of Nebraska at Omaha · Fall 2026"
+subtitle: "ECON 8310: Business Forecasting — University of Nebraska at Omaha"
 author: "Your Name"
 format:
   html:
@@ -141,6 +141,9 @@ each question before asking.
 
 
 Repository rules — these apply to every prompt in this thread:
+- If you cannot write files or run git — a browser chat cannot — then the file and commit
+  rules below are mine to carry out, not yours. Tell me what to write and what to commit,
+  and I will do it. Everything else in this list still applies to you.
 - My submission folder is `submissions/hw06_part2_<my_name>/`. Put everything there.
 - Keep a `PROMPT_LOG.md` in that folder. For every prompt I send, append a block:
       ### Prompt <n> — YYYY-MM-DD HH:MM
@@ -183,7 +186,7 @@ category**.
 # Raw effect per series; mean and spread within each category
 ```
 
-> **Your response:** Report the three category means. SNAP is a food assistance programme — does
+> **Your response:** Report the three category means. SNAP is a food assistance program — does
 > the table agree? State which set of series you are willing to treat as exchangeable and why,
 > and name the specific wrong answer you would get by pooling all thirty.
 
@@ -227,7 +230,7 @@ Fit all three on `train`:
 
 - **Pooled** — one `b` shared by every series
 - **Unpooled** — `b` with `shape=J`, each estimated independently
-- **Hierarchical** — `b_j ~ Normal(mu_b, sd_b)`, written **non-centred**
+- **Hierarchical** — `b_j ~ Normal(mu_b, sd_b)`, written **non-centered**
 
 Each also needs a per-series intercept `a` with `shape=J`.
 
@@ -236,15 +239,15 @@ Each also needs a per-series intercept `a` with `shape=J`.
 ```
 
 ::: {.callout-warning}
-## The centred form will fail, and that is the lesson
+## The centered form will fail, and that is the lesson
 
 Writing the hierarchy as `pm.Normal("b", mu_b, sd_b, shape=J)` produces divergences — a few
 dozen at `target_accept=0.9`. Fit it that way **first**, record the count, then switch to the
-non-centred form and record it again. Report both; your exact count will differ from mine.
+non-centered form and record it again. Report both; your exact count will differ from mine.
 :::
 
-> **Your response:** Report $\hat{R}$, ESS and divergences for all three models plus the centred
-> attempt. Note which of the three diagnostics actually objected to the centred fit — then explain
+> **Your response:** Report $\hat{R}$, ESS and divergences for all three models plus the centered
+> attempt. Note which of the three diagnostics actually objected to the centered fit — then explain
 > what a divergence indicates about the posterior's shape, and why reparameterizing fixes it
 > without changing the model.
 
@@ -255,7 +258,7 @@ non-centred form and record it again. Report both; your exact count will differ 
 Compare the per-series estimates from the unpooled and hierarchical fits.
 
 **(a)** Plot each series' estimate before and after pooling — unpooled on the left, hierarchical
-on the right, a line connecting each series. Colour thin series differently from full ones.
+on the right, a line connecting each series. Color thin series differently from full ones.
 
 **(b)** Compute, separately for thin and full series: the spread of estimates before and after,
 and the **mean absolute distance moved** toward the group mean.
@@ -267,7 +270,7 @@ and the **mean absolute distance moved** toward the group mean.
 > **Your response:** Report the ratio of mean movement, thin versus full. Nobody told the model
 > which series were thin — explain how it inferred that. Then look at the two spread columns
 > together: the thin series' spread nearly disappears while the full series keep most of theirs.
-> Explain why that is the behaviour you want, rather than a sign the model is inconsistent.
+> Explain why that is the behavior you want, rather than a sign the model is inconsistent.
 
 ---
 

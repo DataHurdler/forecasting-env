@@ -1,6 +1,6 @@
 ---
 title: "Homework 7: Bayesian Linear Regression"
-subtitle: "ECON 8310: Business Forecasting — University of Nebraska at Omaha · Fall 2026"
+subtitle: "ECON 8310: Business Forecasting — University of Nebraska at Omaha"
 author: "Your Name"
 format:
   html:
@@ -102,7 +102,7 @@ codes, uniq = pd.factorize(df.series)
 df["idx"] = codes
 J = len(uniq)
 
-# Centre log price within series. NOT standardized -- see the note below.
+# Center log price within series. NOT standardized -- see the note below.
 df["lpc"] = df.lp - df.groupby("series").lp.transform("mean")
 
 print(f"{len(df):,} rows | {J} series | "
@@ -122,7 +122,7 @@ and every percentage claim you build on it in Q6 will be wrong by the factor you
 Leave `lp` in log units. Every predictor in this assignment is already on a scale a manager reads
 directly: log price in percent, `snap` and `event` as 0/1, `t` in years.
 
-Centring within series (`lpc`) is different and is fine — it shifts the variable without
+Centering within series (`lpc`) is different and is fine — it shifts the variable without
 rescaling it, leaves the elasticity untouched, and greatly improves sampling, because price
 levels differ across series and otherwise correlate with the intercepts.
 :::
@@ -163,6 +163,9 @@ each question before asking.
 
 
 Repository rules — these apply to every prompt in this thread:
+- If you cannot write files or run git — a browser chat cannot — then the file and commit
+  rules below are mine to carry out, not yours. Tell me what to write and what to commit,
+  and I will do it. Everything else in this list still applies to you.
 - My submission folder is `submissions/hw07_<my_name>/`. Put everything there.
 - Keep a `PROMPT_LOG.md` in that folder. For every prompt I send, append a block:
       ### Prompt <n> — YYYY-MM-DD HH:MM
@@ -233,7 +236,7 @@ Report the coefficient table for each, and put the two price elasticities side b
 > biased in the direction it is.
 >
 > Then look at the standard errors: the naive estimate is not merely different, it is at least as
-> *precise*. Explain why precision is no defence here.
+> *precise*. Explain why precision is no defense here.
 
 ---
 
@@ -246,7 +249,7 @@ trend, and a per-series intercept. Use weakly informative priors:
 - `alpha ~ Normal(0, 1)` for the intercept
 - `sigma ~ HalfNormal(1)` for observation noise
 
-Give the per-series intercepts a hierarchical prior, written **non-centred**, as in Homework 6.
+Give the per-series intercepts a hierarchical prior, written **non-centered**, as in Homework 6.
 
 Sample with `pm.sample(1000, tune=1500, chains=4, target_accept=0.9)` and report the posterior
 mean, sd and 94% HDI for each coefficient — plus $\hat{R}$, ESS and divergences.

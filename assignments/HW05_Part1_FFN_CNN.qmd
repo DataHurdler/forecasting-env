@@ -1,6 +1,6 @@
 ---
 title: "Homework 5: Deep Learning for Time Series"
-subtitle: "ECON 8310: Business Forecasting — University of Nebraska at Omaha · Fall 2026"
+subtitle: "ECON 8310: Business Forecasting — University of Nebraska at Omaha"
 author: "Your Name"
 format:
   html:
@@ -164,6 +164,9 @@ each question before asking.
 
 
 Repository rules — these apply to every prompt in this thread:
+- If you cannot write files or run git — a browser chat cannot — then the file and commit
+  rules below are mine to carry out, not yours. Tell me what to write and what to commit,
+  and I will do it. Everything else in this list still applies to you.
 - My submission folder is `submissions/hw05_part1_<my_name>/`. Put everything there.
 - Keep a `PROMPT_LOG.md` in that folder. For every prompt I send, append a block:
       ### Prompt <n> — YYYY-MM-DD HH:MM

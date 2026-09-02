@@ -1,6 +1,6 @@
 ---
 title: "Homework 6: Bayesian Foundations, Time Series, and Hierarchical Models"
-subtitle: "ECON 8310: Business Forecasting — University of Nebraska at Omaha · Fall 2026"
+subtitle: "ECON 8310: Business Forecasting — University of Nebraska at Omaha"
 author: "Your Name"
 format:
   html:
@@ -149,6 +149,9 @@ each question before asking.
 
 
 Repository rules — these apply to every prompt in this thread:
+- If you cannot write files or run git — a browser chat cannot — then the file and commit
+  rules below are mine to carry out, not yours. Tell me what to write and what to commit,
+  and I will do it. Everything else in this list still applies to you.
 - My submission folder is `submissions/hw06_part1_<my_name>/`. Put everything there.
 - Keep a `PROMPT_LOG.md` in that folder. For every prompt I send, append a block:
       ### Prompt <n> — YYYY-MM-DD HH:MM
@@ -176,7 +179,7 @@ Submit this text as **`INITIAL_PROMPT.md`** in your submission folder.
 Estimate the probability that any given week is a **high-SNAP week**. Model the count out of
 CA_1 FOODS's 277 weeks as Beta-Binomial:
 
-- Prior: `theta ~ Beta(2, 2)` — weakly informative, centred at 0.5
+- Prior: `theta ~ Beta(2, 2)` — weakly informative, centered at 0.5
 - Likelihood: `obs ~ Binomial(n=277, p=theta)`, observed = the actual count
 
 **Before fitting anything**, run `pm.sample_prior_predictive(500)` and plot what the prior alone
@@ -219,7 +222,7 @@ divergences.
 
 Build the model from Lecture 11 Part 1 on the **first 225 weeks**, holding out the final 52.
 
-- A random-walk level, written **non-centred**: `level = cumsum(z * sigma_level)` with
+- A random-walk level, written **non-centered**: `level = cumsum(z * sigma_level)` with
   `z ~ Normal(0, 1)`
 - Fourier seasonality with `K = 3` and period `P = 52` — six coefficients with `Normal(0, 0.5)` priors
 - `sigma_level ~ Exponential(10)`, `sigma ~ Exponential(1)`
@@ -234,7 +237,7 @@ train, test = ca1.iloc[:-N_TEST], ca1.iloc[-N_TEST:]
 
 > **Your response:** Report $\hat{R}$, ESS and divergences. Then: the lecture noted that writing
 > the level with `pm.GaussianRandomWalk` gave $\hat{R}$ = 1.022 and ESS = 252 — both failing their
-> thresholds while the forecast still looked reasonable. Explain what the non-centred form
+> thresholds while the forecast still looked reasonable. Explain what the non-centered form
 > changes — not statistically, but about the *shape* the sampler has to explore.
 
 ---
