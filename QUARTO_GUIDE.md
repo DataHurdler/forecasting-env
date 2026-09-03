@@ -23,12 +23,23 @@ If that fails, try `python3 --version`. If neither works, install from
 <https://www.python.org/downloads/> — and on Windows, **tick "Add Python to PATH"** on the first
 screen of the installer. Missing that is the single most common Windows setup problem.
 
-Then install the packages:
+Then make an environment and install everything in one command:
 
 ```bash
-pip install jupyter pandas numpy matplotlib statsmodels scikit-learn
-pip install prophet pygam xgboost torch pymc arviz
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
 ```
+
+The `requirements.txt` in this repository lists every package the course needs. Using a virtual
+environment (`.venv`) is worth the extra line: it keeps this course's packages separate from
+anything else on your machine, and it makes "which Python am I actually running?" answerable.
+
+**Then point your editor at it.** In VS Code: **⌘⇧P** (Windows: **Ctrl+Shift+P**) →
+`Python: Select Interpreter` → choose the `.venv` you just made. Skipping this is the most common
+first-week error in this course — you install the packages into one Python and the editor runs a
+different one, and you get `requires the ipykernel package` or `ModuleNotFoundError` on code that
+is perfectly correct.
 
 `jupyter` is not optional. Quarto runs your Python through a Jupyter kernel, so rendering fails
 without it — even though none of your code imports it.

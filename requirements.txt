@@ -1,0 +1,38 @@
+# ECON 8310 — everything the labs and assignments need.
+#
+#   python -m venv .venv
+#   source .venv/bin/activate        # Windows: .venv\Scripts\activate
+#   pip install -r requirements.txt
+#
+# MINIMUMS, NOT EXACT PINS, and that is deliberate. Exact versions would tie you to
+# one Python version and one operating system: a student on a newer Python would get
+# "no matching distribution" for a pinned torch and be stuck at nine in the evening.
+# These floors are the versions the course was built and tested against, so every API
+# the labs use exists. Anything newer is fine.
+#
+# You do not need identical versions to anyone else. Your numbers will differ from the
+# lecture's regardless — different seeds, different hardware, different thread counts —
+# and that is expected and not graded. Quote your own output.
+
+# --- the core, needed from Week 1 -------------------------------------------------
+jupyter>=1.1.1          # NOT optional: Quarto runs your Python through a Jupyter
+                        # kernel, so `quarto render` fails without it even though
+                        # nothing in your code imports it
+pandas>=2.2
+numpy>=1.26
+scipy>=1.13
+matplotlib>=3.9
+statsmodels>=0.14.4     # exponential smoothing, ARIMA, VAR — Weeks 1-2
+
+# --- Weeks 3-6 ---------------------------------------------------------------------
+scikit-learn>=1.5       # trees, random forests, regularization
+prophet>=1.1.5          # Week 3
+pygam>=0.9              # Week 3
+xgboost>=2.1            # Week 5. macOS also needs: brew install libomp
+
+# --- Weeks 7-10, neural networks ---------------------------------------------------
+torch>=2.4              # CPU is fine; no GPU is needed anywhere in this course
+
+# --- Weeks 11-15, Bayesian ---------------------------------------------------------
+pymc>=5.16
+arviz>=0.19
