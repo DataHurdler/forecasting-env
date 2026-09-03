@@ -44,6 +44,15 @@ worth more marks than quietly reporting a number you do not believe.
 
 This part continues Homework 5. See Part 1 for the full framing.
 
+**Learning objectives:**
+
+- Compare five architectures — FFN, CNN, RNN, LSTM and Transformer — on one held-out
+  block and one metric
+- Place those results beside every earlier homework in a single course-wide table
+- Explain an ordering that contradicts the reputations of the methods, from the data
+  rather than from the architecture
+- Write a reflection that says which model you would ship, and why
+
 ---
 
 ## Dataset and Setup

@@ -58,9 +58,11 @@ making it straightforward to compare them on identical train/test splits.
 **Learning objectives:**
 
 - Build a PyTorch `Dataset` and `DataLoader` for sliding-window time series data
-- Train FFN, CNN, LSTM, and Transformer models and monitor loss curves
-- Compare all four architectures on holdout RMSE
-- Synthesize results across all five homeworks into a full course comparison
+- Train a feedforward network on windowed input and read its loss curve
+- Implement a 1D convolutional network, and connect kernel size and dilation to its
+  receptive field
+- Compare the FFN and the CNN on holdout RMSE, and say what the receptive-field
+  experiment showed about window length
 
 ---
 
