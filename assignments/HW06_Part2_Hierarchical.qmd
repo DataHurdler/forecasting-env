@@ -16,7 +16,7 @@ execute:
   message: false
 ---
 
-> **Due Week 15.** Covers Lecture 11 Part 2 (pooling and hierarchical models).
+> **Due Week 14.** Covers Lecture 11 Part 2 (pooling and hierarchical models).
 
 ---
 
