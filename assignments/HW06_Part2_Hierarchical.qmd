@@ -1,7 +1,7 @@
 ---
 title: "Homework 6: Bayesian Foundations, Time Series, and Hierarchical Models"
 subtitle: "ECON 8310: Business Forecasting — University of Nebraska at Omaha"
-author: "Your Name"
+author: "Add your name here"
 format:
   html:
     theme: cosmo
@@ -328,6 +328,7 @@ difference matters when you have groups with very different amounts of data.
 ## Submission Checklist
 
 - [ ] All code cells run without errors from top to bottom
+- [ ] Your name replaces the `author:` placeholder at the top of the document
 - [ ] Written responses completed in your own words
 - [ ] `INITIAL_PROMPT.md` saved in `submissions/hw06_part2_<your_name>/`
 - [ ] `PROMPT_LOG.md` complete with **9 or fewer** entries for Part 2

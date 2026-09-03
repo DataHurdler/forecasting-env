@@ -1,7 +1,7 @@
 ---
 title: "Homework 1, Part 1: Exponential Smoothing"
 subtitle: "ECON 8310: Business Forecasting — University of Nebraska at Omaha"
-author: "Your Name"
+author: "Add your name here"
 format:
   html:
     theme: cosmo
@@ -205,6 +205,7 @@ print(f"train: {len(train)} weeks   test: {len(test)} weeks")
 Before submitting Part 1, confirm each item below.
 
 - [ ] All code cells run without errors from top to bottom (Kernel → Restart & Run All)
+- [ ] Your name replaces the `author:` placeholder at the top of the document
 - [ ] Written responses are completed in your own words — AI-generated prose is not accepted for written sections
 - [ ] `INITIAL_PROMPT.md` is saved in your Part 1 submission folder
 - [ ] `PROMPT_LOG.md` is complete with **4 or fewer** entries (one entry per prompt sent)

@@ -1,7 +1,7 @@
 ---
 title: "Homework 1, Part 2: ARIMA, VAR & Method Comparison"
 subtitle: "ECON 8310: Business Forecasting — University of Nebraska at Omaha"
-author: "Your Name"
+author: "Add your name here"
 format:
   html:
     theme: cosmo
@@ -234,6 +234,7 @@ Which of the methods from this homework (SES, Holt, Holt-Winters, ARIMA, VAR) wo
 Before submitting Part 2, confirm each item below.
 
 - [ ] All code cells run without errors from top to bottom (Kernel → Restart & Run All)
+- [ ] Your name replaces the `author:` placeholder at the top of the document
 - [ ] Written responses are completed in your own words — AI-generated prose is not accepted for written sections
 - [ ] `INITIAL_PROMPT.md` is saved in your Part 2 submission folder
 - [ ] `PROMPT_LOG.md` is complete with **8 or fewer** entries (one entry per prompt sent)

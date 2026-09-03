@@ -1,7 +1,7 @@
 ---
 title: "Homework 4: Boosted Trees and Regularization"
 subtitle: "ECON 8310: Business Forecasting — University of Nebraska at Omaha"
-author: "Your Name"
+author: "Add your name here"
 format:
   html:
     theme: cosmo
@@ -431,6 +431,7 @@ whether that margin justifies the extra machinery.
 Before submitting, confirm:
 
 - [ ] All code cells run without errors from top to bottom
+- [ ] Your name replaces the `author:` placeholder at the top of the document
 - [ ] Written responses completed in your own words (not AI-generated prose)
 - [ ] `INITIAL_PROMPT.md` saved in `submissions/hw04_<your_name>/`
 - [ ] `PROMPT_LOG.md` complete with ≤ 12 entries

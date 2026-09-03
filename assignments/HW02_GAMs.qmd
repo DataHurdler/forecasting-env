@@ -1,7 +1,7 @@
 ---
 title: "Homework 2: Generalized Additive Models"
 subtitle: "ECON 8310: Business Forecasting — University of Nebraska at Omaha"
-author: "Your Name"
+author: "Add your name here"
 format:
   html:
     theme: cosmo
@@ -327,6 +327,7 @@ You are presenting to a Walmart regional operations team that currently forecast
 Before submitting, confirm each item below is complete.
 
 - [ ] All code cells run without errors from a clean kernel restart
+- [ ] Your name replaces the `author:` placeholder at the top of the document
 - [ ] Written responses completed in your own words (not copied from your assistant's output)
 - [ ] `INITIAL_PROMPT.md` saved in your submission folder
 - [ ] `PROMPT_LOG.md` complete with 10 or fewer entries
