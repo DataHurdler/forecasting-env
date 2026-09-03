@@ -172,6 +172,23 @@ The quantity of interest: the effect of a high-SNAP week on log units, store by 
 weekly["ly"] = np.log(weekly.units.clip(lower=1))
 ```
 
+::: {.callout-note}
+## How the code cells work
+
+**A cell that is empty except for a comment is where you write.** The comment states the task;
+your code goes underneath it.
+
+**Some cells already contain setup code** — a train/test split, a rename, a cutoff date — and end
+with a comment marking where your part begins. Leave the setup as it is and write below the
+comment. It is there so that everyone's results are computed on the same basis.
+
+Every cell runs as the document stands, so **you can render at any point, finished or not**. Doing
+that early and often is how you avoid finding a problem at the deadline.
+
+**The `Your response` blocks are written answers, not code.** They are yours to write, in your own
+words — your assistant explains output to you, it does not draft these.
+:::
+
 ### Q1 — What Are You Allowed to Pool? *(Suggested prompts: 1)*
 
 A hierarchy says the groups are **exchangeable**: before seeing the data, you have no reason to
