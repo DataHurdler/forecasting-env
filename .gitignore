@@ -25,7 +25,7 @@ env/
 data/raw/*
 !data/raw/.gitkeep
 # data/processed/ ships with the course now (see STUDENT_QUICKSTART.md).
-# The five prepared datasets are committed; anything else a student writes here is not.
+# The six prepared datasets are committed; anything else a student writes here is not.
 data/processed/*
 !data/processed/.gitkeep
 !data/processed/m5_weekly.csv
@@ -33,3 +33,4 @@ data/processed/*
 !data/processed/fred_monthly.csv
 !data/processed/electricity_daily.csv
 !data/processed/electricity_hourly.csv
+!data/processed/onlinestore_weekly.csv
