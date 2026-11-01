@@ -93,7 +93,7 @@ Write these yourself, in your own words:
 - every **reflection** question
 - anything explaining *why* a model behaved as it did
 
-The assignments' initial prompts now tell your assistant explicitly to explain output to you but
+The assignments' initial prompts tell your assistant explicitly to explain output to you but
 **not** to draft the answers you submit. Keep it that way.
 
 This is not an arbitrary rule. Those sections are what the marks are actually for. A model can
